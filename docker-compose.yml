@@ -1,0 +1,39 @@
+name: chakshu
+
+x-app: &app
+  build:
+    context: .
+    target: runtime
+  image: ghcr.io/havelin-labs/chakshu:${CHAKSHU_VERSION:-dev}
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    CHAKSHU_DATABASE_URL: postgresql+asyncpg://chakshu:${POSTGRES_PASSWORD}@db:5432/chakshu
+  depends_on:
+    db:
+      condition: service_healthy
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chakshu
+      POSTGRES_DB: chakshu
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chakshu -d chakshu"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    <<: *app
+    command: ["web"]
+    ports:
+      - "${CHAKSHU_PORT:-8000}:8000"
+
+volumes:
+  pgdata:
