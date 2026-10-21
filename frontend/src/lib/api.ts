@@ -43,6 +43,24 @@ export type Ready = { status: "ok" | "unavailable"; detail?: string }
 
 export type User = { login: string; name: string | null; avatar_url: string | null; is_admin: boolean }
 
+export type Reviewer = {
+  id: string
+  account: string
+  name: string
+  product: string | null
+  description: string | null
+  owner_team: string
+  model: string | null
+  repos: string[]
+  paths: string[]
+  auto: string[]
+  skills: string[]
+  fail_check_on: string | null
+  source_sha: string
+  source_url: string | null
+  errors: string[]
+}
+
 export type Session = {
   configured: boolean
   setup_claimed: boolean
