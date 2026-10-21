@@ -2,8 +2,9 @@
 
 import logging
 import uuid
+from typing import Any
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chakshu.core import ids
@@ -71,6 +72,25 @@ async def sync_installation(session: AsyncSession, creds: AppCredentials, instal
     )
     log.info("Synced installation %s (%s repos)", installation.id, len(repos))
     return row_id
+
+
+async def ensure_repo(
+    session: AsyncSession, creds: AppCredentials, installation: Installation, payload: dict[str, Any]
+) -> Repo:
+    """The repo row for a webhook's `repository`, created from the payload if it's new to us."""
+    await upsert(
+        session,
+        Repo,
+        {
+            "id": ids.eid(creds.namespace, "repo", payload["id"]),
+            "github_id": payload["id"],
+            "installation_id": installation.id,
+            "full_name": payload["full_name"],
+            "default_branch": payload.get("default_branch") or "main",
+            "private": bool(payload.get("private", True)),
+        },
+    )
+    return await session.scalar(select(Repo).where(Repo.github_id == payload["id"]))
 
 
 async def remove_installation(session: AsyncSession, installation_id: int) -> None:
