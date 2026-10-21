@@ -7,17 +7,17 @@ and decrypted on read; nothing outside this module touches ciphertext.
 
 from enum import StrEnum
 
+from sqlalchemy import delete as sql_delete
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chakshu.core import crypto
 from chakshu.db.models import Setting
+from chakshu.db.upsert import upsert
 
 
 class Key(StrEnum):
     SETUP_CODE = "setup.code"
-    SETUP_CLAIMED = "setup.claimed"
     APP_ID = "github.app_id"
     APP_SLUG = "github.app_slug"
     APP_CLIENT_ID = "github.client_id"
@@ -48,16 +48,18 @@ DEFAULTS: dict[Key, str] = {
 }
 
 
+def _decode(row: Setting) -> str | None:
+    return crypto.decrypt(row.value) if row.is_secret else row.value
+
+
 async def get(session: AsyncSession, key: Key) -> str | None:
     row = await session.get(Setting, key.value)
-    if row is None:
-        return DEFAULTS.get(key)
-    return crypto.decrypt(row.value) if row.is_secret else row.value
+    return DEFAULTS.get(key) if row is None else _decode(row)
 
 
 async def get_many(session: AsyncSession, *keys: Key) -> dict[Key, str | None]:
     rows = (await session.scalars(select(Setting).where(Setting.key.in_([k.value for k in keys])))).all()
-    found = {Key(r.key): (crypto.decrypt(r.value) if r.is_secret else r.value) for r in rows}
+    found = {Key(r.key): _decode(r) for r in rows}
     return {k: found.get(k, DEFAULTS.get(k)) for k in keys}
 
 
@@ -65,13 +67,17 @@ async def put(session: AsyncSession, key: Key, value: str) -> None:
     """Insert or update one setting. The caller commits."""
     is_secret = key in SECRET_KEYS
     stored = crypto.encrypt(value) if is_secret else value
-    stmt = insert(Setting).values(key=key.value, value=stored, is_secret=is_secret)
-    stmt = stmt.on_conflict_do_update(
-        index_elements=[Setting.key], set_={"value": stored, "is_secret": is_secret}
-    )
-    await session.execute(stmt)
+    await upsert(session, Setting, {"key": key.value, "value": stored, "is_secret": is_secret}, key="key")
 
 
-async def put_many(session: AsyncSession, values: dict[Key, str]) -> None:
+async def put_many(session: AsyncSession, values: dict[Key, str | None]) -> None:
+    """Store several settings. A None value deletes that setting."""
     for key, value in values.items():
-        await put(session, key, value)
+        if value is None:
+            await delete(session, key)
+        else:
+            await put(session, key, value)
+
+
+async def delete(session: AsyncSession, key: Key) -> None:
+    await session.execute(sql_delete(Setting).where(Setting.key == key.value))
