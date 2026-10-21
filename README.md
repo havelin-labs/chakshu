@@ -1,8 +1,8 @@
-<p align="center"><img src="brand/logo.svg" alt="Chakshu" width="300"></p>
+<p align="center"><img src="brand/logo.svg" alt="Chakshu" width="260"></p>
 
 # Chakshu
 
-Chakshu (चक्षु, Sanskrit for "the eye") is a self-hosted pull request reviewer for GitHub.
+Chakshu (à¤šà¤•à¥à¤·à¥, Sanskrit for "the eye") is a self-hosted pull request reviewer for GitHub.
 
 Each team in your GitHub organization keeps its own reviewer: skills, rules and settings in a folder in one repo. Anyone on that team comments `@your-org/chakshu` on a pull request, and Chakshu runs the reviewers that belong to them and fit the change. Reviews run on the Claude Agent SDK.
 
@@ -13,3 +13,5 @@ Docs: https://chakshu.havelin.in/docs
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+Design system: [DESIGN.md](DESIGN.md).
