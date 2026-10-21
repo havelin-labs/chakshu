@@ -1,13 +1,14 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+@import "@fontsource-variable/space-grotesk";
+@import "@fontsource-variable/inter";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
+    --font-heading: 'Space Grotesk Variable', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,8 +40,9 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
-    --color-brand-orange: var(--brand-orange);
-    --color-brand-violet: var(--brand-violet);
+    --color-brand-teal: var(--brand-teal);
+    --color-brand-teal-ink: var(--brand-teal-ink);
+    --color-brand-teal-tint: var(--brand-teal-tint);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -51,92 +53,94 @@
 }
 
 /*
- * Chakshu brand
- *   white        #FFFFFF  background
- *   sunset orange #FF5841 gradient start, highlights (not behind text: 3.1:1 with white)
- *   red-violet   #C53678  primary actions (5.0:1 with white text)
+ * Havelin design system, adapted for Chakshu. See DESIGN.md at the repo root.
+ *   bg #F4F5F6, text #0A0A0A, muted #5E6773, accent teal #00C7B0,
+ *   hairline border rgba(204,207,209,0.5), radius 4px.
+ * Teal carries dark text (9:1); white on teal is only about 2:1.
  */
 :root {
-    --brand-orange: #FF5841;
-    --brand-violet: #C53678;
+    --brand-teal: #00C7B0;
+    --brand-teal-ink: #00806F; /* teal dark enough for text on light backgrounds */
+    --brand-teal-tint: rgba(164, 239, 230, 0.2);
 
-    --background: #FFFFFF;
-    --foreground: #1F1722;
+    --background: #F4F5F6;
+    --foreground: #0A0A0A;
     --card: #FFFFFF;
-    --card-foreground: #1F1722;
+    --card-foreground: #0A0A0A;
     --popover: #FFFFFF;
-    --popover-foreground: #1F1722;
-    --primary: #C53678;
-    --primary-foreground: #FFFFFF;
-    --secondary: #FFF1EE;
-    --secondary-foreground: #A8321F;
-    --muted: #F8F4F7;
-    --muted-foreground: #6B5E6E;
-    --accent: #FBEAF2;
-    --accent-foreground: #8E1F55;
+    --popover-foreground: #0A0A0A;
+    --primary: #00C7B0;
+    --primary-foreground: #0A0A0A;
+    --secondary: #FFFFFF;
+    --secondary-foreground: #0A0A0A;
+    --muted: #ECEEF0;
+    --muted-foreground: #5E6773;
+    --accent: rgba(164, 239, 230, 0.2);
+    --accent-foreground: #0A0A0A;
     --destructive: oklch(0.577 0.245 27.325);
-    --border: #EFE4EB;
-    --input: #E7DAE3;
-    --ring: #C53678;
-    --chart-1: #FF5841;
-    --chart-2: #C53678;
-    --chart-3: #E2476A;
-    --chart-4: #8E1F55;
-    --chart-5: #FF9A87;
-    --radius: 0.625rem;
-    --sidebar: #FDF9FB;
-    --sidebar-foreground: #1F1722;
-    --sidebar-primary: #C53678;
-    --sidebar-primary-foreground: #FFFFFF;
-    --sidebar-accent: #FBEAF2;
-    --sidebar-accent-foreground: #8E1F55;
-    --sidebar-border: #EFE4EB;
-    --sidebar-ring: #C53678;
+    --border: rgba(204, 207, 209, 0.5);
+    --input: rgba(204, 207, 209, 0.9);
+    --ring: #00C7B0;
+    --chart-1: #00C7B0;
+    --chart-2: #00806F;
+    --chart-3: #5E6773;
+    --chart-4: #7FE3D7;
+    --chart-5: #0A0A0A;
+    --radius: 0.25rem;
+    --sidebar: #F4F5F6;
+    --sidebar-foreground: #0A0A0A;
+    --sidebar-primary: #00C7B0;
+    --sidebar-primary-foreground: #0A0A0A;
+    --sidebar-accent: rgba(164, 239, 230, 0.2);
+    --sidebar-accent-foreground: #0A0A0A;
+    --sidebar-border: rgba(204, 207, 209, 0.5);
+    --sidebar-ring: #00C7B0;
 }
 
+/* Havelin's site is light-only; this is the same system inverted for dark OS settings. */
 .dark {
-    --background: #150F17;
-    --foreground: #F7F1F5;
-    --card: #1E1621;
-    --card-foreground: #F7F1F5;
-    --popover: #1E1621;
-    --popover-foreground: #F7F1F5;
-    /* A lighter violet keeps buttons readable on the dark background. */
-    --primary: #E35D97;
-    --primary-foreground: #1A0F16;
-    --secondary: #2B1915;
-    --secondary-foreground: #FF9A87;
-    --muted: #261C29;
-    --muted-foreground: #B3A3B5;
-    --accent: #2C1A27;
-    --accent-foreground: #F7B3D1;
+    --brand-teal-ink: #2EE0CA;
+    --brand-teal-tint: rgba(0, 199, 176, 0.08);
+
+    --background: #0B0C0E;
+    --foreground: #F4F5F6;
+    --card: #131518;
+    --card-foreground: #F4F5F6;
+    --popover: #131518;
+    --popover-foreground: #F4F5F6;
+    --primary: #00C7B0;
+    --primary-foreground: #0A0A0A;
+    --secondary: #1A1D21;
+    --secondary-foreground: #F4F5F6;
+    --muted: #1A1D21;
+    --muted-foreground: #9AA3AE;
+    --accent: rgba(0, 199, 176, 0.08);
+    --accent-foreground: #F4F5F6;
     --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: #E35D97;
-    --chart-1: #FF6F5B;
-    --chart-2: #E35D97;
-    --chart-3: #F07A8E;
-    --chart-4: #B84A80;
-    --chart-5: #FFB3A6;
-    --sidebar: #1E1621;
-    --sidebar-foreground: #F7F1F5;
-    --sidebar-primary: #E35D97;
-    --sidebar-primary-foreground: #1A0F16;
-    --sidebar-accent: #2C1A27;
-    --sidebar-accent-foreground: #F7B3D1;
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: #E35D97;
+    --border: rgba(255, 255, 255, 0.08);
+    --input: rgba(255, 255, 255, 0.14);
+    --ring: #00C7B0;
+    --chart-1: #00C7B0;
+    --chart-2: #2EE0CA;
+    --chart-3: #9AA3AE;
+    --chart-4: #007A6C;
+    --chart-5: #F4F5F6;
+    --sidebar: #131518;
+    --sidebar-foreground: #F4F5F6;
+    --sidebar-primary: #00C7B0;
+    --sidebar-primary-foreground: #0A0A0A;
+    --sidebar-accent: rgba(0, 199, 176, 0.08);
+    --sidebar-accent-foreground: #F4F5F6;
+    --sidebar-border: rgba(255, 255, 255, 0.08);
+    --sidebar-ring: #00C7B0;
 }
 
-@utility bg-brand-gradient {
-    background-image: linear-gradient(110deg, var(--brand-orange), var(--brand-violet));
-}
-
-@utility text-brand-gradient {
-    background-image: linear-gradient(110deg, var(--brand-orange), var(--brand-violet));
-    background-clip: text;
-    color: transparent;
+/* The faint 60px line grid Havelin uses behind hero areas. */
+@utility bg-havelin-grid {
+    background-image:
+        linear-gradient(var(--foreground) 1px, transparent 1px),
+        linear-gradient(90deg, var(--foreground) 1px, transparent 1px);
+    background-size: 60px 60px, 60px 60px;
 }
 
 @layer base {
@@ -148,5 +152,8 @@
     }
   html {
     @apply font-sans;
+    }
+  h1, h2, h3 {
+    @apply font-heading;
     }
 }
