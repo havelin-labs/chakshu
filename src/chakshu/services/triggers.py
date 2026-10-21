@@ -121,10 +121,12 @@ async def reply(creds: AppCredentials, req: ReviewRequest, body: str) -> None:
     await client.rest.issues.async_create_comment(owner, name, req.pr_number, body=body)
 
 
-async def clear_team_request(creds: AppCredentials, req: ReviewRequest) -> None:
+async def clear_team_request(
+    creds: AppCredentials, installation_id: int, full_name: str, number: int
+) -> None:
     """Remove the pending chakshu team request so the PR doesn't wait on it."""
-    owner, name = req.repo.full_name.split("/", 1)
-    client = github.installation_client(creds, req.installation.github_id)
+    owner, name = full_name.split("/", 1)
+    client = github.installation_client(creds, installation_id)
     await client.rest.pulls.async_remove_requested_reviewers(
-        owner, name, req.pr_number, reviewers=[], team_reviewers=[mentions.HANDLE_TEAM]
+        owner, name, number, reviewers=[], team_reviewers=[mentions.HANDLE_TEAM]
     )

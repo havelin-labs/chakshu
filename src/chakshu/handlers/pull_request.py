@@ -35,4 +35,6 @@ async def handle(ctx: Context, payload: Payload) -> None:
     outcome = await triggers.request_review(ctx.session, ctx.creds, request)
     if outcome.refused and requester:
         await triggers.reply(ctx.creds, request, outcome.refused)
-        await triggers.clear_team_request(ctx.creds, request)
+        await triggers.clear_team_request(
+            ctx.creds, installation.github_id, repo.full_name, request.pr_number
+        )
