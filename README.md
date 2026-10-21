@@ -1,3 +1,5 @@
+<p align="center"><img src="brand/logo.svg" alt="Chakshu" width="300"></p>
+
 # Chakshu
 
 Chakshu (चक्षु, Sanskrit for "the eye") is a self-hosted pull request reviewer for GitHub.
