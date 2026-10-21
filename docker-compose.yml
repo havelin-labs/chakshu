@@ -45,5 +45,19 @@ services:
     ports:
       - "${CHAKSHU_PORT:-8000}:8000"
 
+  worker:
+    <<: *app
+    command: ["worker"]
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "chakshu", "worker-health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+
 volumes:
   pgdata:
