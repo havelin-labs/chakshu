@@ -4,7 +4,12 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom"
 import { Layout } from "@/components/layout"
 import { RequireUser } from "@/components/require-user"
 import { LoginPage } from "@/pages/login-page"
+import { RepoPage } from "@/pages/repo-page"
+import { ReposPage } from "@/pages/repos-page"
 import { ReviewersPage } from "@/pages/reviewers-page"
+import { RunPage } from "@/pages/run-page"
+import { RunsPage } from "@/pages/runs-page"
+import { SettingsPage } from "@/pages/settings-page"
 import { SetupInstalledPage } from "@/pages/setup-installed-page"
 import { SetupPage } from "@/pages/setup-page"
 import { StatusPage } from "@/pages/status-page"
@@ -15,12 +20,16 @@ const router = createBrowserRouter([
   {
     element: <Layout />,
     children: [
-      { path: "/", element: signedIn(<StatusPage />) },
+      { path: "/", element: signedIn(<RunsPage />) },
+      { path: "/runs/:id", element: signedIn(<RunPage />) },
+      { path: "/repos", element: signedIn(<ReposPage />) },
+      { path: "/repos/:id", element: signedIn(<RepoPage />) },
+      { path: "/reviewers", element: signedIn(<ReviewersPage />) },
+      { path: "/settings", element: signedIn(<SettingsPage />, true) },
+      { path: "/status", element: signedIn(<StatusPage />) },
       { path: "/login", element: <LoginPage /> },
       { path: "/setup", element: <SetupPage /> },
       { path: "/setup/installed", element: <SetupInstalledPage /> },
-      { path: "/reviewers", element: signedIn(<ReviewersPage />) },
-      { path: "/status", element: signedIn(<StatusPage />) },
     ],
   },
 ])

@@ -5,9 +5,11 @@ import { UserMenu } from "@/components/user-menu"
 import { useSession } from "@/hooks/use-session"
 import { cn } from "@/lib/utils"
 
-// Pages add themselves here as they land.
 const NAV: { to: string; label: string; admin?: boolean }[] = [
+  { to: "/", label: "Reviews" },
+  { to: "/repos", label: "Repositories" },
   { to: "/reviewers", label: "Reviewers" },
+  { to: "/settings", label: "Settings", admin: true },
   { to: "/status", label: "Status" },
 ]
 
@@ -30,6 +32,7 @@ export function Layout() {
                   <NavLink
                     key={item.to}
                     to={item.to}
+                    end={item.to === "/"}
                     className={({ isActive }) =>
                       cn("text-muted-foreground hover:text-foreground", isActive && "text-foreground")
                     }
