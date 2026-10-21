@@ -1,17 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" role="img" aria-label="Chakshu">
-  <defs>
-    <linearGradient id="chakshu-mark" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#FF5841"/>
-      <stop offset="1" stop-color="#C53678"/>
-    </linearGradient>
-    <linearGradient id="chakshu-word" x1="78" y1="0" x2="296" y2="0" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#FF5841"/>
-      <stop offset="1" stop-color="#C53678"/>
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="16" fill="url(#chakshu-mark)"/>
-  <path d="M11 32c5.6-9.2 13-13.8 21-13.8S47.4 22.8 53 32c-5.6 9.2-13 13.8-21 13.8S16.6 41.2 11 32Z" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round"/>
-  <circle cx="32" cy="32" r="8.5" fill="#FFFFFF"/>
-  <circle cx="34.6" cy="29.4" r="2.9" fill="#C53678"/>
-  <text x="80" y="44" font-family="Geist, 'Inter', 'Segoe UI', system-ui, sans-serif" font-size="40" font-weight="700" letter-spacing="-1" fill="url(#chakshu-word)">chakshu</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 290 56" role="img" aria-label="Chakshu">
+  <g transform="translate(-4 -4)">
+    <path d="M10 32c6-9.4 13.4-14 22-14s16 4.6 22 14c-6 9.4-13.4 14-22 14s-16-4.6-22-14Z" fill="none" stroke="#0A0A0A" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="32" cy="32" r="7.5" fill="none" stroke="#00C7B0" stroke-width="3"/>
+    <circle cx="32" cy="32" r="2.8" fill="#00C7B0"/>
+    <circle cx="10" cy="32" r="3.6" fill="#00C7B0"/>
+    <circle cx="54" cy="32" r="3.6" fill="#00C7B0"/>
+  </g>
+  <text x="66" y="40" font-family="'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif" font-size="34" font-weight="700" letter-spacing="-0.5" fill="#0A0A0A">Chakshu</text>
 </svg>
