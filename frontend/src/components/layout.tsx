@@ -6,7 +6,10 @@ import { useSession } from "@/hooks/use-session"
 import { cn } from "@/lib/utils"
 
 // Pages add themselves here as they land.
-const NAV: { to: string; label: string; admin?: boolean }[] = [{ to: "/status", label: "Status" }]
+const NAV: { to: string; label: string; admin?: boolean }[] = [
+  { to: "/reviewers", label: "Reviewers" },
+  { to: "/status", label: "Status" },
+]
 
 export function Layout() {
   const { data: session } = useSession()
