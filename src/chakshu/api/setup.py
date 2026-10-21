@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
-from chakshu.api.deps import CredentialsDep, csrf_protect, require_setup_session
+from chakshu.api.deps import CredentialsDep, csrf_protect, require_setup_or_admin
 from chakshu.db.session import SessionDep
 from chakshu.services import github, installations, setup
 
@@ -36,7 +36,7 @@ async def claim(body: ClaimRequest, request: Request, session: SessionDep) -> di
     return {"ok": True}
 
 
-@router.post("/manifest", dependencies=[Depends(require_setup_session), Depends(_ensure_not_configured)])
+@router.post("/manifest", dependencies=[Depends(require_setup_or_admin), Depends(_ensure_not_configured)])
 async def manifest(body: ManifestRequest, request: Request) -> dict:
     state = secrets.token_urlsafe(24)
     request.session["manifest_state"] = state
@@ -48,7 +48,7 @@ async def manifest(body: ManifestRequest, request: Request) -> dict:
     }
 
 
-@router.get("/callback", dependencies=[Depends(require_setup_session)])
+@router.get("/callback", dependencies=[Depends(require_setup_or_admin)])
 async def callback(code: str, state: str, request: Request, session: SessionDep) -> RedirectResponse:
     expected = request.session.pop("manifest_state", None)
     if not (expected and secrets.compare_digest(state, expected)):
@@ -58,7 +58,7 @@ async def callback(code: str, state: str, request: Request, session: SessionDep)
     return RedirectResponse(github.install_url(creds.slug), status.HTTP_303_SEE_OTHER)
 
 
-@router.post("/sync", dependencies=[Depends(require_setup_session)])
+@router.post("/sync", dependencies=[Depends(require_setup_or_admin)])
 async def sync(creds: CredentialsDep, session: SessionDep) -> dict:
     count = await installations.sync_all(session, creds)
     await session.commit()
