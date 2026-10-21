@@ -61,6 +61,74 @@ export type Reviewer = {
   errors: string[]
 }
 
+export type RunStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled"
+
+export type Run = {
+  id: string
+  repo: string
+  repo_id: string
+  reviewer: string
+  pr_number: number
+  pr_title: string | null
+  pr_url: string
+  head_sha: string
+  trigger: string
+  requested_by: string | null
+  status: RunStatus
+  progress: string | null
+  model: string | null
+  cost_usd: number | null
+  duration_ms: number | null
+  review_url: string | null
+  created_at: string
+  finished_at: string | null
+}
+
+export type Finding = {
+  path: string
+  line: number
+  severity: string
+  category: string
+  title: string
+  body: string
+  suggestion?: string
+  skill?: string
+}
+
+export type RunDetail = Run & {
+  note: string | null
+  error: string | null
+  attempts: number
+  result: {
+    summary: string
+    findings: Finding[]
+    posted: number
+    summary_only: number
+    repeats: number
+  } | null
+}
+
+export type Repo = { id: string; full_name: string; private: boolean; enabled: boolean }
+
+export type Pull = {
+  number: number
+  title: string
+  author: string | null
+  draft: boolean
+  head_sha: string
+  updated_at: string
+  url: string
+}
+
+export type ReviewOutcome = { queued: string[]; already: string[]; refused: string | null }
+
+export type AdminSettings = {
+  anthropic_api_key: { set: boolean; hint: string; from_env: boolean }
+  default_model: string
+  max_usd_per_review: number
+  reviewers_repo: string
+}
+
 export type Session = {
   configured: boolean
   setup_claimed: boolean
