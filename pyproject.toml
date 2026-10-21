@@ -16,6 +16,7 @@ dependencies = [
   "cryptography>=44",
   "githubkit[auth-app]>=0.13,<1",
   "itsdangerous>=2.2,<3",
+  "pyyaml>=6.0,<7",
 ]
 
 [project.optional-dependencies]
