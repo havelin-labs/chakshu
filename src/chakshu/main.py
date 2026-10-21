@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
 from chakshu import __version__
-from chakshu.api import auth, health, reviewers, session, setup
+from chakshu.api import auth, health, reviewers, session, setup, webhooks
 from chakshu.api.spa import mount_spa
 from chakshu.core import crypto
 from chakshu.core.config import get_settings
@@ -51,7 +51,15 @@ def create_app() -> FastAPI:
         same_site="lax",
         https_only=settings.secure_cookies,
     )
-    for router in (health.router, session.router, setup.router, auth.router, auth.api, reviewers.router):
+    for router in (
+        health.router,
+        session.router,
+        setup.router,
+        auth.router,
+        auth.api,
+        reviewers.router,
+        webhooks.router,
+    ):
         app.include_router(router)
     # Registered last: its catch-all route must not shadow the API.
     mount_spa(app, Path(settings.frontend_dir))
