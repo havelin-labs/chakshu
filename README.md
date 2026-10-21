@@ -2,7 +2,7 @@
 
 # Chakshu
 
-Chakshu (चक्षु, Sanskrit for "the eye") is a self-hosted pull request reviewer for GitHub.
+Chakshu (à¤šà¤•à¥à¤·à¥, Sanskrit for "the eye") is a self-hosted pull request reviewer for GitHub.
 
 Each team in your organization keeps its own reviewer: a folder with skills, rules and settings in one repo. Anyone on that team comments `@your-org/chakshu` on a pull request, and Chakshu runs the reviewers that belong to them and fit the change. Each one posts its own review and check. Reviews run on the Claude Agent SDK with read-only tools.
 
@@ -26,7 +26,7 @@ Then open `CHAKSHU_BASE_URL` in a browser:
 2. Name the GitHub App, pick your organization and click **Create on GitHub**.
 3. Install the app on the repos you want reviewed, plus your reviewers repo.
 4. Sign in with GitHub as an org owner and add your Anthropic API key under **Settings**.
-5. Create `<org>/chakshu-reviewers` from [`templates/chakshu-reviewers`](templates/chakshu-reviewers) and press **Sync from GitHub** on the Reviewers page.
+5. Create `<org>/chakshu-reviewers` from the [reviewers template](https://github.com/havelin-labs/chakshu-reviewers-template) (or copy [`templates/chakshu-reviewers`](templates/chakshu-reviewers)), then press **Sync from GitHub** on the Reviewers page.
 6. Create an empty team called `chakshu` in your organization, with read access to the repos.
 
 Comment `@<org>/chakshu` on a pull request, or press **Review** on its page in the portal.
