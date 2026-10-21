@@ -29,9 +29,19 @@ services:
       timeout: 3s
       retries: 20
 
+  migrate:
+    <<: *app
+    command: ["migrate"]
+    restart: "no"
+
   web:
     <<: *app
     command: ["web"]
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "${CHAKSHU_PORT:-8000}:8000"
 

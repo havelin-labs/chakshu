@@ -1,0 +1,8 @@
+﻿# Local development additions:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db
+# exposes Postgres on localhost:5433 so tests and `chakshu web` can run outside Docker.
+# (5433 avoids clashing with a Postgres you may already run on 5432.)
+services:
+  db:
+    ports:
+      - "127.0.0.1:5433:5432"
