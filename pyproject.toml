@@ -14,6 +14,8 @@ dependencies = [
   "asyncpg>=0.30,<1",
   "alembic>=1.15,<2",
   "cryptography>=44",
+  "githubkit[auth-app]>=0.13,<1",
+  "itsdangerous>=2.2,<3",
 ]
 
 [project.optional-dependencies]
