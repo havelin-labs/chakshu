@@ -81,6 +81,7 @@ class Reviewer(Base, TimestampMixin):
     auto: Mapped[list[str]] = mapped_column(JSONB, default=list)
     skills: Mapped[list[str]] = mapped_column(JSONB, default=list)
     limits: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    rules: Mapped[str | None] = mapped_column(String(300))
     fail_check_on: Mapped[str | None] = mapped_column(String(20))
     source_path: Mapped[str] = mapped_column(String(300))
     source_sha: Mapped[str] = mapped_column(String(40))
@@ -111,6 +112,7 @@ class Run(Base, TimestampMixin):
     repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
     reviewer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("reviewers.id", ondelete="CASCADE"))
     pr_number: Mapped[int] = mapped_column(Integer)
+    pr_title: Mapped[str | None] = mapped_column(String(500))
     head_sha: Mapped[str] = mapped_column(String(40))
     reviewer_sha: Mapped[str] = mapped_column(String(40))
     trigger: Mapped[str] = mapped_column(String(30))  # mention | review_requested | auto | portal
