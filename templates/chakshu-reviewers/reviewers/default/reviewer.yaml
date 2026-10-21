@@ -1,0 +1,17 @@
+# The org-wide fallback. Chakshu runs it when nobody's own reviewer matches a pull request.
+name: default
+product: Everything else
+description: General correctness and security review for any repo
+owner_team: platform        # GitHub team slug that owns and can call this reviewer
+model: sonnet
+repos: ["*"]                # repo names or glob patterns
+paths: []                   # empty means every file
+auto: []                    # e.g. [opened, ready_for_review] to run without being asked
+skills:
+  - correctness
+  - shared/secure-coding
+limits:
+  max_usd: 2
+  max_findings: 10
+  min_severity: medium
+fail_check_on: critical

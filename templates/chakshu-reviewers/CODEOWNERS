@@ -1,0 +1,3 @@
+# Each team owns its reviewer folder. Replace the team names with yours.
+/reviewers/default/   @your-org/platform
+/shared/              @your-org/platform
