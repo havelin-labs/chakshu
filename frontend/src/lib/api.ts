@@ -1,4 +1,4 @@
-// One place for talking to the Chakshu API, so every page handles errors the same way.
+// One place for talking to the Chakshu API, so every page handles errors and CSRF the same way.
 
 export class ApiError extends Error {
   readonly status: number
@@ -9,14 +9,45 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(path, { credentials: "same-origin", headers: { Accept: "application/json" } })
-  const body = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    throw new ApiError(response.status, body.detail ?? response.statusText)
-  }
-  return body as T
+let csrfToken = ""
+
+export function setCsrfToken(token: string) {
+  csrfToken = token
 }
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = { Accept: "application/json" }
+  if (body !== undefined) headers["Content-Type"] = "application/json"
+  if (method !== "GET") headers["X-CSRF-Token"] = csrfToken
+
+  const response = await fetch(path, {
+    method,
+    credentials: "same-origin",
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const detail = typeof data.detail === "string" ? data.detail : response.statusText
+    throw new ApiError(response.status, detail)
+  }
+  return data as T
+}
+
+export const apiGet = <T>(path: string) => request<T>("GET", path)
+export const apiPost = <T>(path: string, body: unknown = {}) => request<T>("POST", path, body)
+export const apiPut = <T>(path: string, body: unknown = {}) => request<T>("PUT", path, body)
 
 export type Health = { status: string; version: string }
 export type Ready = { status: "ok" | "unavailable"; detail?: string }
+
+export type User = { login: string; name: string | null; avatar_url: string | null; is_admin: boolean }
+
+export type Session = {
+  configured: boolean
+  setup_claimed: boolean
+  app: { slug: string; install_url: string } | null
+  webhooks: boolean
+  user: User | null
+  csrf_token: string
+}
