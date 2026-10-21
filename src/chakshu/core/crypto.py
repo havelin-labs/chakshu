@@ -34,6 +34,11 @@ def _fernet(secret_key: str) -> Fernet:
     return Fernet(base64.urlsafe_b64encode(derived))
 
 
+def require_secret_key() -> None:
+    """Fail at startup, with a helpful message, if CHAKSHU_SECRET_KEY is missing or short."""
+    _fernet(get_settings().secret_key)
+
+
 def encrypt(plaintext: str) -> str:
     return _fernet(get_settings().secret_key).encrypt(plaintext.encode()).decode()
 
