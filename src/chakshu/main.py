@@ -1,7 +1,10 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 
 from chakshu import __version__
 from chakshu.api import health
+from chakshu.api.spa import mount_spa
 from chakshu.core.config import get_settings
 from chakshu.core.logging import configure_logging
 
@@ -12,4 +15,6 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="Chakshu", version=__version__, docs_url=None, redoc_url=None)
     app.include_router(health.router)
+    # Registered last: its catch-all route must not shadow the API.
+    mount_spa(app, Path(settings.frontend_dir))
     return app
