@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     github_url: str = "https://github.com"
     github_api_url: str = "https://api.github.com"
     worker_concurrency: int = 2
+    # Built React portal. The Docker image sets this; locally it's frontend/dist.
+    frontend_dir: str = "frontend/dist"
     log_level: str = "INFO"
 
     @field_validator("base_url", "webhook_url", "github_url", "github_api_url")
