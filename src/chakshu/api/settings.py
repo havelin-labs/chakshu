@@ -2,14 +2,16 @@
 
 import os
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from githubkit.exception import RequestFailed
 from pydantic import BaseModel, Field
 
-from chakshu.api.deps import AdminDep, csrf_protect
+from chakshu.api.deps import AdminDep, CredentialsDep, csrf_protect
 from chakshu.core import crypto
+from chakshu.core.config import get_settings as get_config
 from chakshu.db.session import SessionDep
 from chakshu.services import settings_store as store
-from chakshu.services import spend
+from chakshu.services import setup, spend
 from chakshu.services.settings_store import Key
 
 router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=[Depends(csrf_protect)])
@@ -42,6 +44,12 @@ async def _read(session: SessionDep) -> dict:
         "monthly_cap_usd": float(budget.cap) if budget.cap is not None else None,
         "spend_this_month": float(budget.month_to_date),
         "reviewers_repo": values[Key.REVIEWERS_REPO],
+        "webhooks": {
+            "url": get_config().hook_url,
+            "public": setup.webhooks_reachable(),
+            "secret_set": bool(await store.get(session, Key.APP_WEBHOOK_SECRET)),
+            "events": setup.APP_EVENTS,
+        },
     }
 
 
@@ -63,3 +71,15 @@ async def update_settings(body: SettingsUpdate, session: SessionDep, _: AdminDep
     await store.put_many(session, values)
     await session.commit()
     return await _read(session)
+
+
+@router.post("/webhooks")
+async def connect_webhooks(session: SessionDep, creds: CredentialsDep, _: AdminDep) -> dict:
+    """Set the GitHub App's webhook URL and a new secret, so GitHub can deliver events here."""
+    try:
+        url = await setup.connect_webhooks(session, creds)
+    except RequestFailed as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, f"GitHub refused the webhook settings ({exc.response.status_code})."
+        ) from exc
+    return {"url": url}

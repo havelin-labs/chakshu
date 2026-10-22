@@ -144,6 +144,7 @@ export type AdminSettings = {
   monthly_cap_usd: number | null
   spend_this_month: number
   reviewers_repo: string
+  webhooks: { url: string; public: boolean; secret_set: boolean; events: string[] }
 }
 
 export type SkillStat = {

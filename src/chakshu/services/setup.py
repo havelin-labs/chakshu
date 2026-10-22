@@ -87,6 +87,20 @@ def manifest_action_url(org: str | None, state: str) -> str:
     return f"{base}{path}?state={quote(state)}"
 
 
+async def connect_webhooks(session: AsyncSession, creds: AppCredentials) -> str:
+    """Point the app's webhook at this instance with a fresh secret, and store the secret.
+
+    For apps created without webhooks (e.g. on localhost). Returns the URL used.
+    """
+    url = get_settings().hook_url
+    secret = secrets.token_urlsafe(32)
+    client = github.app_client(creds)  # keep a reference: githubkit namespaces hold the client weakly
+    await client.rest.apps.async_update_webhook_config_for_app(url=url, secret=secret, content_type="json")
+    await store.put(session, Key.APP_WEBHOOK_SECRET, secret)
+    await session.commit()
+    return url
+
+
 async def complete_manifest(session: AsyncSession, code: str) -> AppCredentials:
     """Swap the one-time manifest code for the app's credentials and store them."""
     client = github.unauth_client()  # keep a reference: githubkit namespaces hold the client weakly
