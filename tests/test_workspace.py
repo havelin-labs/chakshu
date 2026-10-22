@@ -62,6 +62,22 @@ def test_prompt_fences_untrusted_text():
     assert "Skills to apply: correctness." in text
 
 
+def test_incremental_prompt_shows_only_new_changes():
+    pr = prompt.PullRequest("acme/api", 7, "Fix", "dev", "main", "fix", "")
+    text = prompt.build_prompt(
+        pr,
+        [("a.py", "@@ -1 +1 @@\n+old"), ("b.py", "@@ -1 +1 @@\n+new")],
+        [],
+        None,
+        since="1234567890abcdef",
+        new_files=[("b.py", "@@ -1 +1 @@\n+new")],
+    )
+    assert "already reviewed this pull request at commit 1234567" in text
+    assert "Every file changed in the pull request: a.py, b.py." in text
+    assert '<untrusted source="diff since 1234567">' in text
+    assert "+old" not in text
+
+
 def test_long_diffs_are_trimmed_per_file():
     diff = prompt.render_diff([("a.py", "x" * 50), ("b.py", "y" * 100)], limit=80)
     assert "--- a.py\n" + "x" * 50 in diff

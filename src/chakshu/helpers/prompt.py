@@ -92,9 +92,19 @@ def render_diff(files: Sequence[tuple[str, str | None]], limit: int = MAX_DIFF) 
     return "".join(parts)
 
 
+FileDiff = tuple[str, str | None]
+
+
 def build_prompt(
-    pr: PullRequest, files: Sequence[tuple[str, str | None]], skills: Sequence[str], note: str | None
+    pr: PullRequest,
+    files: Sequence[FileDiff],
+    skills: Sequence[str],
+    note: str | None,
+    *,
+    since: str | None = None,
+    new_files: Sequence[FileDiff] | None = None,
 ) -> str:
+    """`since` + `new_files`: the PR was reviewed before at `since`; focus on what changed after it."""
     sections = [
         f"Review pull request #{pr.number} in {pr.repo} ({pr.base} <- {pr.head}) by @{pr.author}.",
         f"Skills to apply: {', '.join(skills) if skills else 'none; use CLAUDE.md'}.",
@@ -103,7 +113,15 @@ def build_prompt(
     ]
     if note:
         sections.append(_fence("note from the person who asked for this review", _clip(note, 1_000)))
-    sections.append(_fence("diff", render_diff(files)))
+    if since and new_files is not None:
+        sections.append(
+            f"You already reviewed this pull request at commit {since[:7]}. Review only what changed "
+            "since then (the diff below). Read other files for context, but don't repeat earlier findings. "
+            f"Every file changed in the pull request: {', '.join(path for path, _ in files)}."
+        )
+        sections.append(_fence(f"diff since {since[:7]}", render_diff(new_files)))
+    else:
+        sections.append(_fence("diff", render_diff(files)))
     sections.append("Return the summary and findings in the required JSON format.")
     return "\n\n".join(sections)
 

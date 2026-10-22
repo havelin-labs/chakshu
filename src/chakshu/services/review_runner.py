@@ -49,6 +49,25 @@ async def _review_settings(session: AsyncSession, reviewer: Reviewer) -> tuple[s
     return model, max_usd, values[Key.ANTHROPIC_API_KEY]
 
 
+async def _changes_since(
+    client: GitHub, owner: str, name: str, since: str, head: str
+) -> list[tuple[str, str | None]] | None:
+    """Files changed between the last reviewed commit and now, or None for a full review.
+
+    Falls back to a full review when history was rewritten (force push) or the
+    comparison isn't available.
+    """
+    try:
+        comparison = (
+            await client.rest.repos.async_compare_commits(owner, name, f"{since}...{head}")
+        ).parsed_data
+    except RequestFailed:
+        return None
+    if comparison.status != "ahead" or not comparison.files:
+        return None
+    return [(f.filename, f.patch) for f in comparison.files]
+
+
 async def _execute(
     session: AsyncSession,
     creds: AppCredentials,
@@ -67,6 +86,10 @@ async def _execute(
         (f.filename, f.patch)
         async for f in client.rest.paginate(client.rest.pulls.async_list_files, owner, name, run.pr_number)
     ]
+    since = await runs.last_reviewed_head(session, run)
+    new_files = await _changes_since(client, owner, name, since, run.head_sha) if since else None
+    if new_files is None:
+        since = None
     reviewers_repo = await catalog.reviewers_repo(session, installation)
     if reviewers_repo is None:
         raise RuntimeError("The reviewers repo is no longer visible to the app.")
@@ -98,6 +121,8 @@ async def _execute(
             files,
             ws.skills,
             run.note,
+            since=since,
+            new_files=new_files,
         )
         result = await engine.review(ws.root, prompt, model=model, max_usd=max_usd, api_key=api_key)
 
@@ -141,6 +166,7 @@ async def _execute(
         "summary_only": len(published.plan.summary_only),
         "repeats": published.plan.repeats,
         "turns": result.turns,
+        "since": since,
     }
     run.review_url = published.review_url
     run.status = RunStatus.SUCCEEDED
