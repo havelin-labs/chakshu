@@ -143,6 +143,27 @@ class Run(Base, JobMixin, TimestampMixin):
     __table_args__ = (Index("ix_runs_status_created_at", "status", "created_at"),)
 
 
+class FindingOutcome(StrEnum):
+    OPEN = "open"
+    FIXED = "fixed"
+    DISMISSED = "dismissed"
+
+
+class PostedFinding(Base, TimestampMixin):
+    """An inline finding Chakshu posted, and what became of it. Feeds the per-skill stats."""
+
+    __tablename__ = "posted_findings"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)  # the finding's deterministic ID
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"))
+    reviewer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("reviewers.id", ondelete="CASCADE"), index=True)
+    skill: Mapped[str | None] = mapped_column(String(100))
+    severity: Mapped[str] = mapped_column(String(20))
+    category: Mapped[str] = mapped_column(String(30))
+    outcome: Mapped[FindingOutcome] = mapped_column(String(20), default=FindingOutcome.OPEN)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class WebhookEvent(Base, JobMixin, TimestampMixin):
     """A GitHub webhook delivery, stored before it's handled so nothing is lost on restart.
 

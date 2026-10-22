@@ -26,6 +26,7 @@ from chakshu.services import (
     catalog,
     checks,
     engine,
+    finding_stats,
     github,
     publisher,
     queue,
@@ -79,13 +80,18 @@ async def _changes_since(
     return [(f.filename, f.patch) for f in comparison.files]
 
 
-async def _resolve_outdated(client: GitHub, full_name: str, number: int, found_ids: set[str]) -> int:
-    """Tidy-up only: a failure here never fails the review."""
+async def _tidy_threads(
+    session: AsyncSession, client: GitHub, run: Run, full_name: str, published: publisher.Published
+) -> int:
+    """Record posted findings, resolve finished threads, record outcomes. Never fails the review."""
+    await finding_stats.record_posted(session, run, published.plan.inline)
     try:
-        return await threads.resolve_outdated(client, full_name, number, found_ids)
+        scan = await threads.tidy(client, full_name, run.pr_number, published.found_ids)
     except Exception:  # noqa: BLE001
-        log.warning("Couldn't resolve outdated threads on %s#%s", full_name, number, exc_info=True)
+        log.warning("Couldn't check review threads on %s#%s", full_name, run.pr_number, exc_info=True)
         return 0
+    await finding_stats.record_outcomes(session, scan.fixed, scan.dismissed)
+    return len(scan.resolve)
 
 
 async def _execute(
@@ -164,7 +170,7 @@ async def _execute(
         pr_key=runs.pr_key(creds.namespace, repo, run.pr_number),
         reviewer_id=reviewer.id,
     )
-    resolved = await _resolve_outdated(client, repo.full_name, run.pr_number, published.found_ids)
+    resolved = await _tidy_threads(session, client, run, repo.full_name, published)
     conclusion = findings.conclusion(published.chosen, reviewer.fail_check_on)
     summary = findings.render_review_body(reviewer.name, result.summary, published.plan)
     if published.review_url:
