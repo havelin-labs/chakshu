@@ -1,13 +1,17 @@
-"""Resolve Chakshu's own review threads once the code they pointed at has changed.
+"""Chakshu's review threads: resolve the ones that are done, and read what became of each finding.
 
-A thread is resolved only when all of these hold: its first comment carries a
-Chakshu finding marker, GitHub marks it outdated, and the latest review didn't
-raise the same finding again. Threads started by people are never touched.
+Only threads whose first comment carries a Chakshu finding marker are looked at;
+threads people started are never touched.
+
+- Chakshu resolves a thread when GitHub marks it outdated (the code changed) and
+  the latest review didn't raise the same finding again. Outcome: fixed.
+- A thread someone else resolved after the code changed: fixed.
+- A thread someone resolved while the code is unchanged: dismissed.
 """
 
 import logging
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from githubkit import GitHub
 
@@ -41,16 +45,26 @@ class Thread:
     first_comment: str
 
 
-def to_resolve(threads: Iterable[Thread], still_found: set[str]) -> list[str]:
-    """IDs of Chakshu threads that are outdated and whose finding didn't come back."""
-    ids = []
+@dataclass
+class Scan:
+    resolve: list[str] = field(default_factory=list)  # thread IDs Chakshu should resolve now
+    fixed: set[str] = field(default_factory=set)  # finding IDs
+    dismissed: set[str] = field(default_factory=set)
+
+
+def classify(threads: Iterable[Thread], still_found: set[str]) -> Scan:
+    scan = Scan()
     for thread in threads:
-        if thread.resolved or not thread.outdated:
-            continue
         marker = MARKER_RE.search(thread.first_comment)
-        if marker and marker.group(1) not in still_found:
-            ids.append(thread.id)
-    return ids
+        if not marker:
+            continue
+        finding_id = marker.group(1)
+        if thread.resolved:
+            (scan.fixed if thread.outdated else scan.dismissed).add(finding_id)
+        elif thread.outdated and finding_id not in still_found:
+            scan.resolve.append(thread.id)
+            scan.fixed.add(finding_id)
+    return scan
 
 
 async def _threads(client: GitHub, owner: str, name: str, number: int) -> list[Thread]:
@@ -75,11 +89,12 @@ async def _threads(client: GitHub, owner: str, name: str, number: int) -> list[T
         after = page["pageInfo"]["endCursor"]
 
 
-async def resolve_outdated(client: GitHub, full_name: str, number: int, still_found: set[str]) -> int:
+async def tidy(client: GitHub, full_name: str, number: int, still_found: set[str]) -> Scan:
+    """Resolve finished Chakshu threads and return the outcome of every Chakshu thread."""
     owner, name = full_name.split("/", 1)
-    ids = to_resolve(await _threads(client, owner, name, number), still_found)
-    for thread_id in ids:
+    scan = classify(await _threads(client, owner, name, number), still_found)
+    for thread_id in scan.resolve:
         await client.async_graphql(RESOLVE_MUTATION, {"id": thread_id})
-    if ids:
-        log.info("Resolved %s outdated Chakshu thread(s) on %s#%s", len(ids), full_name, number)
-    return len(ids)
+    if scan.resolve:
+        log.info("Resolved %s outdated Chakshu thread(s) on %s#%s", len(scan.resolve), full_name, number)
+    return scan
