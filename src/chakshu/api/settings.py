@@ -93,6 +93,14 @@ async def connect_webhooks(session: SessionDep, creds: CredentialsDep, _: AdminD
     try:
         url = await setup.connect_webhooks(session, creds)
     except RequestFailed as exc:
+        if exc.response.status_code == 404:
+            # GitHub only creates an app's webhook once a URL is saved in its settings page.
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"This GitHub App has no webhook yet. In its settings on GitHub, tick Webhook Active, "
+                f"set the URL to {get_config().hook_url}, leave the secret empty and save. "
+                "Then press Connect webhooks again.",
+            ) from exc
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY, f"GitHub refused the webhook settings ({exc.response.status_code})."
         ) from exc
