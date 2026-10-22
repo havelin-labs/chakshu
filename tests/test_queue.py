@@ -43,7 +43,8 @@ async def _seed(db, count: int) -> list[uuid.UUID]:
 
 async def _claim():
     async with get_sessionmaker()() as session:
-        return await queue.claim_next(session)
+        run = await queue.claim(session, Run)
+        return run.id if run else None
 
 
 async def test_concurrent_workers_never_claim_the_same_run(db):
@@ -58,7 +59,7 @@ async def test_concurrent_workers_never_claim_the_same_run(db):
 
 async def test_stale_running_runs_are_requeued(db):
     [run_id] = await _seed(db, 1)
-    await queue.claim_next(db)
+    await queue.claim(db, Run)
     run = await db.get(Run, run_id)
     run.started_at = datetime.now(UTC) - timedelta(hours=1)
     await db.commit()

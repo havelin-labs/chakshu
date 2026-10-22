@@ -90,16 +90,17 @@ class Reviewer(Base, TimestampMixin):
     __table_args__ = (Index("uq_reviewers_installation_name", "installation_id", "name", unique=True),)
 
 
-class RunStatus(StrEnum):
+class JobStatus(StrEnum):
+    """Lifecycle shared by everything the worker processes (runs, webhook events)."""
+
     QUEUED = "queued"
     RUNNING = "running"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
 
-    @property
-    def finished(self) -> bool:
-        return self in {RunStatus.SUCCEEDED, RunStatus.FAILED, RunStatus.CANCELLED}
+
+RunStatus = JobStatus
 
 
 class Run(Base, TimestampMixin):
@@ -134,11 +135,21 @@ class Run(Base, TimestampMixin):
     __table_args__ = (Index("ix_runs_status_created_at", "status", "created_at"),)
 
 
-class WebhookDelivery(Base):
-    """GitHub delivery IDs we've already handled, so redeliveries are ignored."""
+class WebhookEvent(Base, TimestampMixin):
+    """A GitHub webhook delivery, stored before it's handled so nothing is lost on restart.
 
-    __tablename__ = "webhook_deliveries"
+    The primary key is GitHub's delivery ID, so redeliveries are dropped on insert.
+    """
+
+    __tablename__ = "webhook_events"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     event: Mapped[str] = mapped_column(String(50))
-    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    status: Mapped[JobStatus] = mapped_column(String(20), default=JobStatus.QUEUED)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (Index("ix_webhook_events_status_created_at", "status", "created_at"),)
