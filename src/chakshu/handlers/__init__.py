@@ -3,7 +3,9 @@
 import logging
 from collections.abc import Awaitable, Callable
 
-from chakshu.db.session import get_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from chakshu.db.models import WebhookEvent
 from chakshu.handlers import installation, issue_comment, pull_request, push
 from chakshu.handlers.context import Context, Payload
 from chakshu.services import github
@@ -21,18 +23,10 @@ HANDLERS: dict[str, Handler] = {
 }
 
 
-async def dispatch(event: str, delivery_id: str, payload: Payload) -> None:
-    """Run the handler for an event in its own DB session. Errors are logged, never raised."""
-    handler = HANDLERS.get(event)
-    if handler is None:
+async def handle(session: AsyncSession, event: WebhookEvent) -> None:
+    """Run the handler for a stored event. Raises on failure so the caller can retry."""
+    handler = HANDLERS.get(event.event)
+    creds = await github.load_credentials(session)
+    if handler is None or creds is None:
         return
-    async with get_sessionmaker()() as session:
-        creds = await github.load_credentials(session)
-        if creds is None:
-            return
-        try:
-            await handler(Context(session, creds, delivery_id), payload)
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            log.exception("Webhook %s (%s) failed", event, delivery_id)
+    await handler(Context(session, creds, event.id), event.payload)
