@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState, type FormEvent } from "react"
 
+import { ConnectorsCard } from "@/components/connectors-card"
 import { ErrorNotice, Notice } from "@/components/notice"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -136,6 +137,7 @@ export function SettingsPage() {
           </form>
         </CardContent>
       </Card>
+      <ConnectorsCard />
     </section>
   )
 }
