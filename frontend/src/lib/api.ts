@@ -129,6 +129,16 @@ export type AdminSettings = {
   reviewers_repo: string
 }
 
+export type FailedEvent = {
+  id: string
+  event: string
+  action: string | null
+  repo: string | null
+  attempts: number
+  error: string | null
+  received_at: string
+}
+
 export type Session = {
   configured: boolean
   setup_claimed: boolean
