@@ -107,5 +107,6 @@ def user_client(token: str) -> GitHub:
 
 async def installation_token(creds: AppCredentials, installation_id: int) -> str:
     """Short-lived token for git operations (clones), valid for about an hour."""
-    resp = await app_client(creds).rest.apps.async_create_installation_access_token(installation_id)
+    client = app_client(creds)  # keep a reference: githubkit namespaces hold the client weakly
+    resp = await client.rest.apps.async_create_installation_access_token(installation_id)
     return resp.parsed_data.token

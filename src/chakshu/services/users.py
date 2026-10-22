@@ -55,7 +55,8 @@ async def access(session: AsyncSession, creds: AppCredentials, login: str) -> tu
 async def sign_in(session: AsyncSession, creds: AppCredentials, code: str) -> User:
     oauth = github.oauth_client(creds)
     token = (await oauth.auth.as_web_user(code).async_exchange_token(oauth)).token
-    profile = (await github.user_client(token).rest.users.async_get_authenticated()).parsed_data
+    user = github.user_client(token)  # keep a reference: githubkit namespaces hold the client weakly
+    profile = (await user.rest.users.async_get_authenticated()).parsed_data
 
     allowed, is_admin = await access(session, creds, profile.login)
     if not allowed:
