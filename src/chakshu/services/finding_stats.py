@@ -1,15 +1,20 @@
 """Remember posted findings, record their outcomes and summarise them per skill."""
 
+import logging
 import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
+from githubkit import GitHub
 from sqlalchemy import case, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chakshu.db.models import FindingOutcome, Installation, PostedFinding, Reviewer, Run
 from chakshu.helpers.findings import Identified
+from chakshu.services import threads
+
+log = logging.getLogger(__name__)
 
 
 async def record_posted(session: AsyncSession, run: Run, items: Iterable[Identified]) -> None:
@@ -43,6 +48,22 @@ async def record_outcomes(session: AsyncSession, fixed: set[str], dismissed: set
                 )
                 .values(outcome=outcome.value, closed_at=datetime.now(UTC))
             )
+
+
+async def sweep(
+    session: AsyncSession, client: GitHub, full_name: str, number: int, still_found: set[str]
+) -> int:
+    """Resolve finished Chakshu threads on a PR and record outcomes. Returns how many it resolved.
+
+    Tidy-up only: GitHub errors are logged, never raised.
+    """
+    try:
+        scan = await threads.tidy(client, full_name, number, still_found)
+    except Exception:  # noqa: BLE001
+        log.warning("Couldn't check review threads on %s#%s", full_name, number, exc_info=True)
+        return 0
+    await record_outcomes(session, scan.fixed, scan.dismissed)
+    return len(scan.resolve)
 
 
 def _count(outcome: FindingOutcome):
