@@ -103,7 +103,20 @@ class JobStatus(StrEnum):
 RunStatus = JobStatus
 
 
-class Run(Base, TimestampMixin):
+class JobMixin:
+    """Queue columns shared by runs and webhook events (see services/queue.py)."""
+
+    status: Mapped[JobStatus] = mapped_column(String(20), default=JobStatus.QUEUED)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Which worker holds the job, and when it last said it was still on it.
+    worker_id: Mapped[str | None] = mapped_column(String(100))
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Run(Base, JobMixin, TimestampMixin):
     """One reviewer reviewing one pull request at one commit. Doubles as the job queue."""
 
     __tablename__ = "runs"
@@ -119,8 +132,6 @@ class Run(Base, TimestampMixin):
     trigger: Mapped[str] = mapped_column(String(30))  # mention | review_requested | auto | portal
     requested_by: Mapped[str | None] = mapped_column(String(100))
     note: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[RunStatus] = mapped_column(String(20), default=RunStatus.QUEUED)
-    attempts: Mapped[int] = mapped_column(Integer, default=0)
     progress: Mapped[str | None] = mapped_column(Text)
     model: Mapped[str | None] = mapped_column(String(100))
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 4))
@@ -128,14 +139,11 @@ class Run(Base, TimestampMixin):
     result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     review_url: Mapped[str | None] = mapped_column(String(500))
     check_run_id: Mapped[int | None] = mapped_column(BigInteger)
-    error: Mapped[str | None] = mapped_column(Text)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (Index("ix_runs_status_created_at", "status", "created_at"),)
 
 
-class WebhookEvent(Base, TimestampMixin):
+class WebhookEvent(Base, JobMixin, TimestampMixin):
     """A GitHub webhook delivery, stored before it's handled so nothing is lost on restart.
 
     The primary key is GitHub's delivery ID, so redeliveries are dropped on insert.
@@ -146,10 +154,5 @@ class WebhookEvent(Base, TimestampMixin):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     event: Mapped[str] = mapped_column(String(50))
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
-    status: Mapped[JobStatus] = mapped_column(String(20), default=JobStatus.QUEUED)
-    attempts: Mapped[int] = mapped_column(Integer, default=0)
-    error: Mapped[str | None] = mapped_column(Text)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (Index("ix_webhook_events_status_created_at", "status", "created_at"),)

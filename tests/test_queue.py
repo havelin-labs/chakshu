@@ -41,30 +41,46 @@ async def _seed(db, count: int) -> list[uuid.UUID]:
     return ids
 
 
-async def _claim():
+async def _claim(worker: str):
     async with get_sessionmaker()() as session:
-        run = await queue.claim(session, Run)
+        run = await queue.claim(session, Run, worker)
         return run.id if run else None
 
 
 async def test_concurrent_workers_never_claim_the_same_run(db):
     seeded = await _seed(db, 3)
 
-    claimed = await asyncio.gather(*(_claim() for _ in range(5)))
+    claimed = await asyncio.gather(*(_claim(f"w{n}") for n in range(5)))
 
     got = [c for c in claimed if c is not None]
     assert sorted(got) == sorted(seeded)
     assert claimed.count(None) == 2
 
 
-async def test_stale_running_runs_are_requeued(db):
+async def test_runs_without_a_heartbeat_are_requeued(db):
     [run_id] = await _seed(db, 1)
-    await queue.claim(db, Run)
+    await queue.claim(db, Run, "dead")
     run = await db.get(Run, run_id)
-    run.started_at = datetime.now(UTC) - timedelta(hours=1)
+    run.heartbeat_at = datetime.now(UTC) - timedelta(minutes=5)
     await db.commit()
 
+    assert await queue.heartbeat(db, "someone-else") == 0
     assert await queue.requeue_stale(db) == 1
     await db.refresh(run)
-    assert run.status == RunStatus.QUEUED
-    assert run.attempts == 1
+    assert run.status == RunStatus.QUEUED and run.worker_id is None and run.attempts == 1
+
+
+async def test_live_heartbeats_keep_the_run(db):
+    await _seed(db, 1)
+    await queue.claim(db, Run, "alive")
+    assert await queue.heartbeat(db, "alive") == 1
+    assert await queue.requeue_stale(db) == 0
+
+
+async def test_release_hands_back_without_using_an_attempt(db):
+    [run_id] = await _seed(db, 1)
+    await queue.claim(db, Run, "stopping")
+
+    assert await queue.release(db, "stopping") == 1
+    run = await db.get(Run, run_id, populate_existing=True)
+    assert run.status == RunStatus.QUEUED and run.attempts == 0

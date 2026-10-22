@@ -48,6 +48,8 @@ services:
   worker:
     <<: *app
     command: ["worker"]
+    # Running reviews get up to 9 minutes to finish on shutdown (see worker.py).
+    stop_grace_period: 10m
     depends_on:
       db:
         condition: service_healthy
