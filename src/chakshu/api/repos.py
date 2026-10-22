@@ -7,7 +7,7 @@ from sqlalchemy import select
 from chakshu.api.deps import AdminDep, CredentialsDep, UserDep, csrf_protect
 from chakshu.db.models import Installation, Repo
 from chakshu.db.session import SessionDep
-from chakshu.services import github, triggers
+from chakshu.services import github, installations, triggers
 
 router = APIRouter(prefix="/api/repos", tags=["repos"], dependencies=[Depends(csrf_protect)])
 
@@ -39,6 +39,14 @@ async def list_repos(session: SessionDep, _: UserDep) -> list[dict]:
     return [
         {"id": str(r.id), "full_name": r.full_name, "private": r.private, "enabled": r.enabled} for r in repos
     ]
+
+
+@router.post("/sync")
+async def sync_repos(session: SessionDep, creds: CredentialsDep, _: AdminDep) -> dict:
+    """Re-read installations and repo access from GitHub, e.g. after changing the app's access there."""
+    count = await installations.sync_all(session, creds)
+    await session.commit()
+    return {"installations": count}
 
 
 @router.put("/{repo_id}")
