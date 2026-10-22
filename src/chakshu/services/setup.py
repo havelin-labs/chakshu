@@ -89,7 +89,8 @@ def manifest_action_url(org: str | None, state: str) -> str:
 
 async def complete_manifest(session: AsyncSession, code: str) -> AppCredentials:
     """Swap the one-time manifest code for the app's credentials and store them."""
-    app = (await github.unauth_client().rest.apps.async_create_from_manifest(code)).parsed_data
+    client = github.unauth_client()  # keep a reference: githubkit namespaces hold the client weakly
+    app = (await client.rest.apps.async_create_from_manifest(code)).parsed_data
     await store.put_many(
         session,
         {

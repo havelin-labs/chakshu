@@ -4,6 +4,7 @@ import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
+from githubkit.exception import RequestFailed
 from pydantic import BaseModel, Field
 
 from chakshu.api.deps import CredentialsDep, csrf_protect, require_setup_or_admin
@@ -50,11 +51,20 @@ async def manifest(body: ManifestRequest, request: Request) -> dict:
 
 @router.get("/callback", dependencies=[Depends(require_setup_or_admin)])
 async def callback(code: str, state: str, request: Request, session: SessionDep) -> RedirectResponse:
-    expected = request.session.pop("manifest_state", None)
+    expected = request.session.get("manifest_state")
     if not (expected and secrets.compare_digest(state, expected)):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Setup link expired. Start again from the portal.")
     await _ensure_not_configured(session)
-    creds = await setup.complete_manifest(session, code)
+    try:
+        creds = await setup.complete_manifest(session, code)
+    except RequestFailed as exc:
+        # Keep the state so reloading this page can retry while GitHub's code is still valid (one hour).
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            f"GitHub didn't accept the app setup ({exc.response.status_code}). "
+            "Reload to retry, or start again.",
+        ) from exc
+    request.session.pop("manifest_state", None)
     return RedirectResponse(github.install_url(creds.slug), status.HTTP_303_SEE_OTHER)
 
 
