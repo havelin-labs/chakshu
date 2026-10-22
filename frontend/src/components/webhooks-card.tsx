@@ -14,7 +14,6 @@ export function WebhooksCard({ webhooks }: { webhooks: AdminSettings["webhooks"]
     mutationFn: () => apiPost<{ url: string }>("/api/settings/webhooks"),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["settings"] }),
   })
-  const appSettings = session?.app ? `https://github.com/settings/apps/${session.app.slug}` : null
 
   return (
     <Card className="mt-6">
@@ -43,15 +42,9 @@ export function WebhooksCard({ webhooks }: { webhooks: AdminSettings["webhooks"]
         <ErrorNotice error={connect.error} />
         {connect.isSuccess && (
           <Notice>
-            Done. On GitHub, open the app's settings
-            {appSettings && (
-              <>
-                {" "}
-                (<a className="underline" href={appSettings} target="_blank" rel="noreferrer">open</a>)
-              </>
-            )}
-            , make sure <b>Webhook: Active</b> is ticked, and under <b>Permissions &amp; events</b> subscribe to{" "}
-            {webhooks.events.join(", ")}.
+            Done. On GitHub, open the app's settings (the owner's Settings, Developer settings, GitHub Apps
+            {session?.app && <>, {session.app.slug}</>}), make sure <b>Webhook: Active</b> is ticked, and under{" "}
+            <b>Permissions &amp; events</b> subscribe to {webhooks.events.join(", ")}.
           </Notice>
         )}
         <Button onClick={() => connect.mutate()} disabled={!webhooks.public || connect.isPending}>
