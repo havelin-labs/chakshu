@@ -106,6 +106,7 @@ export type RunDetail = Run & {
     summary_only: number
     repeats: number
     since?: string | null
+    resolved?: number
   } | null
 }
 

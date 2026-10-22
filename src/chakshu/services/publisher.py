@@ -18,6 +18,8 @@ class Published:
     review_url: str | None
     plan: f.Plan
     chosen: list[f.Finding]
+    # IDs of everything the agent found this time, posted or not; older threads for these stay open.
+    found_ids: set[str]
 
 
 async def _markers(client: GitHub, owner: str, repo: str, number: int) -> set[str]:
@@ -47,17 +49,15 @@ async def publish(
     reviewer_id: uuid.UUID,
 ) -> Published:
     owner, repo = full_name.split("/", 1)
-    chosen = f.choose(
-        (f.Finding.parse(raw) for raw in raw_findings),
-        limits.get("min_severity") or "medium",
-        int(limits.get("max_findings") or 10),
-    )
+    parsed = [f.Finding.parse(raw) for raw in raw_findings]
+    found_ids = {str(f.identify(ns, pr_key, reviewer_id, finding).id) for finding in parsed}
+    chosen = f.choose(parsed, limits.get("min_severity") or "medium", int(limits.get("max_findings") or 10))
     items = [f.identify(ns, pr_key, reviewer_id, finding) for finding in chosen]
     commentable = {path: commentable_lines(patch) for path, patch in patches.items()}
     plan = f.plan(items, commentable, await _markers(client, owner, repo, number))
 
     if not plan.new and plan.repeats:
-        return Published(review_url=None, plan=plan, chosen=chosen)
+        return Published(review_url=None, plan=plan, chosen=chosen, found_ids=found_ids)
 
     try:
         review = await _post(client, owner, repo, number, head_sha, reviewer, summary, plan)
@@ -68,7 +68,7 @@ async def publish(
         log.warning("Inline comments rejected on %s#%s; posting as summary", full_name, number)
         plan = f.Plan(summary_only=plan.inline + plan.summary_only, repeats=plan.repeats)
         review = await _post(client, owner, repo, number, head_sha, reviewer, summary, plan)
-    return Published(review_url=review.html_url, plan=plan, chosen=chosen)
+    return Published(review_url=review.html_url, plan=plan, chosen=chosen, found_ids=found_ids)
 
 
 async def _post(client, owner, repo, number, head_sha, reviewer, summary, plan: f.Plan):

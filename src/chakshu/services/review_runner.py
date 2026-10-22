@@ -22,7 +22,18 @@ from chakshu.db.session import get_sessionmaker
 from chakshu.helpers import findings
 from chakshu.helpers.git import GitError
 from chakshu.helpers.prompt import PullRequest, build_prompt
-from chakshu.services import catalog, checks, engine, github, publisher, queue, runs, triggers, workspace
+from chakshu.services import (
+    catalog,
+    checks,
+    engine,
+    github,
+    publisher,
+    queue,
+    runs,
+    threads,
+    triggers,
+    workspace,
+)
 from chakshu.services import settings_store as store
 from chakshu.services.github import AppCredentials
 from chakshu.services.settings_store import Key
@@ -66,6 +77,15 @@ async def _changes_since(
     if comparison.status != "ahead" or not comparison.files:
         return None
     return [(f.filename, f.patch) for f in comparison.files]
+
+
+async def _resolve_outdated(client: GitHub, full_name: str, number: int, found_ids: set[str]) -> int:
+    """Tidy-up only: a failure here never fails the review."""
+    try:
+        return await threads.resolve_outdated(client, full_name, number, found_ids)
+    except Exception:  # noqa: BLE001
+        log.warning("Couldn't resolve outdated threads on %s#%s", full_name, number, exc_info=True)
+        return 0
 
 
 async def _execute(
@@ -144,6 +164,7 @@ async def _execute(
         pr_key=runs.pr_key(creds.namespace, repo, run.pr_number),
         reviewer_id=reviewer.id,
     )
+    resolved = await _resolve_outdated(client, repo.full_name, run.pr_number, published.found_ids)
     conclusion = findings.conclusion(published.chosen, reviewer.fail_check_on)
     summary = findings.render_review_body(reviewer.name, result.summary, published.plan)
     if published.review_url:
@@ -167,6 +188,7 @@ async def _execute(
         "repeats": published.plan.repeats,
         "turns": result.turns,
         "since": since,
+        "resolved": resolved,
     }
     run.review_url = published.review_url
     run.status = RunStatus.SUCCEEDED
