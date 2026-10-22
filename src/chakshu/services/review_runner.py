@@ -25,6 +25,7 @@ from chakshu.helpers.prompt import PullRequest, build_prompt
 from chakshu.services import (
     catalog,
     checks,
+    connectors,
     engine,
     finding_stats,
     github,
@@ -106,6 +107,9 @@ async def _execute(
         raise RuntimeError("The reviewers repo is no longer visible to the app.")
     model, max_usd, api_key = await _review_settings(session, reviewer)
     run.model = model
+    toolsets = await connectors.toolsets_for(
+        session, reviewer.connectors, "\n".join([pr.title, pr.head.ref, pr.body or ""])
+    )
 
     await queue.set_progress(session, run, "Preparing workspace")
     token = await github.installation_token(creds, installation.github_id)
@@ -134,8 +138,11 @@ async def _execute(
             run.note,
             since=since,
             new_files=new_files,
+            hints=[t.prompt_hint for t in toolsets],
         )
-        result = await engine.review(ws.root, prompt, model=model, max_usd=max_usd, api_key=api_key)
+        result = await engine.review(
+            ws.root, prompt, model=model, max_usd=max_usd, api_key=api_key, toolsets=toolsets
+        )
 
     run.cost_usd = Decimal(str(result.cost_usd)) if result.cost_usd is not None else None
     run.duration_ms = result.duration_ms

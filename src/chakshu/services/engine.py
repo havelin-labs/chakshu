@@ -8,12 +8,14 @@ throwaway directory so nothing leaks between runs.
 
 import logging
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
+from chakshu.connectors import Toolset
 from chakshu.helpers.prompt import FINDINGS_SCHEMA, SYSTEM_PROMPT
 
 log = logging.getLogger(__name__)
@@ -48,18 +50,27 @@ def _env(api_key: str | None, config_dir: Path) -> dict[str, str]:
     return env
 
 
-def options(workspace: Path, *, model: str, max_usd: float, api_key: str | None) -> ClaudeAgentOptions:
+def options(
+    workspace: Path,
+    *,
+    model: str,
+    max_usd: float,
+    api_key: str | None,
+    toolsets: Sequence[Toolset] = (),
+) -> ClaudeAgentOptions:
     config_dir = workspace.parent / "claude-config"
     config_dir.mkdir(exist_ok=True)
     return ClaudeAgentOptions(
         cwd=str(workspace),
         system_prompt=SYSTEM_PROMPT,
         tools=TOOLS,
-        allowed_tools=TOOLS,
+        # Connector tools are read-only lookups that run in this process, not in the agent's sandbox.
+        allowed_tools=TOOLS + [name for t in toolsets for name in t.tool_names],
         permission_mode="dontAsk",
         setting_sources=["project"],
         skills="all",
         strict_mcp_config=True,
+        mcp_servers={t.server_name: t.server for t in toolsets},
         model=model,
         max_turns=MAX_TURNS,
         max_budget_usd=max_usd,
@@ -69,13 +80,18 @@ def options(workspace: Path, *, model: str, max_usd: float, api_key: str | None)
 
 
 async def review(
-    workspace: Path, prompt: str, *, model: str, max_usd: float, api_key: str | None
+    workspace: Path,
+    prompt: str,
+    *,
+    model: str,
+    max_usd: float,
+    api_key: str | None,
+    toolsets: Sequence[Toolset] = (),
 ) -> ReviewResult:
     result: ResultMessage | None = None
+    opts = options(workspace, model=model, max_usd=max_usd, api_key=api_key, toolsets=toolsets)
     try:
-        async for message in query(
-            prompt=prompt, options=options(workspace, model=model, max_usd=max_usd, api_key=api_key)
-        ):
+        async for message in query(prompt=prompt, options=opts):
             if isinstance(message, ResultMessage):
                 result = message
     except Exception as exc:
