@@ -62,6 +62,7 @@ def _row(creds: AppCredentials, installation: Installation, sha: str, parsed: Pa
         "limits": spec.limits.model_dump() if spec else {},
         "rules": spec.rules if spec else None,
         "fail_check_on": spec.fail_check_on if spec else None,
+        "connectors": spec.connectors if spec else [],
         "source_path": parsed.source_path,
         "source_sha": sha,
         "errors": parsed.errors,

@@ -81,6 +81,7 @@ class Reviewer(Base, TimestampMixin):
     auto: Mapped[list[str]] = mapped_column(JSONB, default=list)
     skills: Mapped[list[str]] = mapped_column(JSONB, default=list)
     limits: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    connectors: Mapped[list[str]] = mapped_column(JSONB, default=list)
     rules: Mapped[str | None] = mapped_column(String(300))
     fail_check_on: Mapped[str | None] = mapped_column(String(20))
     source_path: Mapped[str] = mapped_column(String(300))
@@ -141,6 +142,20 @@ class Run(Base, JobMixin, TimestampMixin):
     check_run_id: Mapped[int | None] = mapped_column(BigInteger)
 
     __table_args__ = (Index("ix_runs_status_created_at", "status", "created_at"),)
+
+
+class Connector(Base, TimestampMixin):
+    """An outside system reviewers can read from, set up by an admin (e.g. Jira)."""
+
+    __tablename__ = "connectors"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(50), unique=True)  # what reviewer.yaml refers to
+    kind: Mapped[str] = mapped_column(String(30))
+    base_url: Mapped[str] = mapped_column(String(300))
+    username: Mapped[str | None] = mapped_column(String(200))
+    secret_enc: Mapped[str | None] = mapped_column(Text)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class FindingOutcome(StrEnum):

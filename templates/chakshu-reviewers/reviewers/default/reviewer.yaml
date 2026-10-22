@@ -15,3 +15,4 @@ limits:
   max_findings: 10
   min_severity: medium
 fail_check_on: critical
+connectors: []             # e.g. [jira] after an admin adds a Jira connector

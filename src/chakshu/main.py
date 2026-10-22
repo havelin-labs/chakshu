@@ -8,7 +8,19 @@ from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
 from chakshu import __version__
-from chakshu.api import auth, events, health, repos, reviewers, runs, session, setup, stats, webhooks
+from chakshu.api import (
+    auth,
+    connectors,
+    events,
+    health,
+    repos,
+    reviewers,
+    runs,
+    session,
+    setup,
+    stats,
+    webhooks,
+)
 from chakshu.api import settings as settings_api
 from chakshu.api.spa import mount_spa
 from chakshu.core import crypto
@@ -65,6 +77,7 @@ def create_app() -> FastAPI:
         webhooks.router,
         events.router,
         stats.router,
+        connectors.router,
     ):
         app.include_router(router)
     # Registered last: its catch-all route must not shadow the API.

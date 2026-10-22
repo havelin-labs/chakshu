@@ -74,7 +74,7 @@ def _clip(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[:limit] + "\n[truncated]"
 
 
-def _fence(label: str, text: str) -> str:
+def fence(label: str, text: str) -> str:
     # Neutralise a closing tag inside the content so it can't break out of the fence.
     safe = text.replace("</untrusted>", "<\\/untrusted>")
     return f'<untrusted source="{label}">\n{safe}\n</untrusted>'
@@ -103,25 +103,27 @@ def build_prompt(
     *,
     since: str | None = None,
     new_files: Sequence[FileDiff] | None = None,
+    hints: Sequence[str] = (),
 ) -> str:
     """`since` + `new_files`: the PR was reviewed before at `since`; focus on what changed after it."""
     sections = [
         f"Review pull request #{pr.number} in {pr.repo} ({pr.base} <- {pr.head}) by @{pr.author}.",
         f"Skills to apply: {', '.join(skills) if skills else 'none; use CLAUDE.md'}.",
-        _fence("pull request title", pr.title),
-        _fence("pull request description", _clip(pr.description or "(none)", MAX_DESCRIPTION)),
+        fence("pull request title", pr.title),
+        fence("pull request description", _clip(pr.description or "(none)", MAX_DESCRIPTION)),
     ]
     if note:
-        sections.append(_fence("note from the person who asked for this review", _clip(note, 1_000)))
+        sections.append(fence("note from the person who asked for this review", _clip(note, 1_000)))
     if since and new_files is not None:
         sections.append(
             f"You already reviewed this pull request at commit {since[:7]}. Review only what changed "
             "since then (the diff below). Read other files for context, but don't repeat earlier findings. "
             f"Every file changed in the pull request: {', '.join(path for path, _ in files)}."
         )
-        sections.append(_fence(f"diff since {since[:7]}", render_diff(new_files)))
+        sections.append(fence(f"diff since {since[:7]}", render_diff(new_files)))
     else:
-        sections.append(_fence("diff", render_diff(files)))
+        sections.append(fence("diff", render_diff(files)))
+    sections.extend(hints)  # ours, not the PR's: e.g. which connector tools are available
     sections.append("Return the summary and findings in the required JSON format.")
     return "\n\n".join(sections)
 
