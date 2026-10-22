@@ -39,10 +39,9 @@ class ReviewResult:
     turns: int | None = None
 
 
-def _env(api_key: str | None, config_dir: Path) -> dict[str, str]:
+def _env(auth_env: dict[str, str], config_dir: Path) -> dict[str, str]:
     env = {"CLAUDE_CONFIG_DIR": str(config_dir), "DISABLE_TELEMETRY": "1", "DISABLE_AUTOUPDATER": "1"}
-    if api_key:
-        env["ANTHROPIC_API_KEY"] = api_key
+    env |= auth_env  # API key or subscription token, from model_access
     # Bedrock/Vertex users configure these in the container environment instead of an API key.
     for name in ("CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "AWS_REGION", "ANTHROPIC_BASE_URL"):
         if os.environ.get(name):
@@ -55,7 +54,7 @@ def options(
     *,
     model: str,
     max_usd: float,
-    api_key: str | None,
+    auth_env: dict[str, str],
     toolsets: Sequence[Toolset] = (),
 ) -> ClaudeAgentOptions:
     config_dir = workspace.parent / "claude-config"
@@ -75,7 +74,7 @@ def options(
         max_turns=MAX_TURNS,
         max_budget_usd=max_usd,
         output_format={"type": "json_schema", "schema": FINDINGS_SCHEMA},
-        env=_env(api_key, config_dir),
+        env=_env(auth_env, config_dir),
     )
 
 
@@ -85,11 +84,11 @@ async def review(
     *,
     model: str,
     max_usd: float,
-    api_key: str | None,
+    auth_env: dict[str, str],
     toolsets: Sequence[Toolset] = (),
 ) -> ReviewResult:
     result: ResultMessage | None = None
-    opts = options(workspace, model=model, max_usd=max_usd, api_key=api_key, toolsets=toolsets)
+    opts = options(workspace, model=model, max_usd=max_usd, auth_env=auth_env, toolsets=toolsets)
     try:
         async for message in query(prompt=prompt, options=opts):
             if isinstance(message, ResultMessage):
