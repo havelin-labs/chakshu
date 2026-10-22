@@ -78,3 +78,50 @@ async def db() -> AsyncIterator[AsyncSession]:
         tables = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
         await session.execute(text(f"TRUNCATE {tables} CASCADE"))
         await session.commit()
+
+
+@pytest.fixture
+def seed_runs(db):
+    """`await seed_runs(n)`: an installation, repo and reviewer plus n queued runs. Returns run IDs."""
+    import uuid
+
+    from chakshu.db.models import Installation, JobStatus, Repo, Reviewer, Run
+
+    async def seed(count: int) -> list[uuid.UUID]:
+        installation = Installation(
+            id=uuid.uuid4(),
+            github_id=1,
+            account_github_id=2,
+            account_login="acme",
+            account_type="Organization",
+        )
+        repo = Repo(id=uuid.uuid4(), github_id=3, installation_id=installation.id, full_name="acme/api")
+        reviewer = Reviewer(
+            id=uuid.uuid4(),
+            installation_id=installation.id,
+            name="default",
+            owner_team="core",
+            source_path="reviewers/default",
+            source_sha="a" * 40,
+        )
+        db.add_all([installation, repo, reviewer])
+        await db.flush()
+        runs = [
+            Run(
+                id=uuid.uuid4(),
+                work_key=uuid.uuid4(),
+                repo_id=repo.id,
+                reviewer_id=reviewer.id,
+                pr_number=n + 1,
+                head_sha="b" * 40,
+                reviewer_sha="a" * 40,
+                trigger="mention",
+                status=JobStatus.QUEUED,
+            )
+            for n in range(count)
+        ]
+        db.add_all(runs)
+        await db.commit()
+        return [run.id for run in runs]
+
+    return seed
