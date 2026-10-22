@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from chakshu.db.models import Installation, Repo, Reviewer
 from chakshu.helpers import mentions, messages, selection
-from chakshu.services import github, orgs, runs
+from chakshu.services import github, orgs, runs, spend
 from chakshu.services.github import AppCredentials
 
 log = logging.getLogger(__name__)
@@ -57,6 +57,12 @@ async def _caller_teams(
 
 
 async def request_review(session: AsyncSession, creds: AppCredentials, req: ReviewRequest) -> Outcome:
+    budget = await spend.current(session)
+    if budget.over_cap:
+        return Outcome(
+            refused=messages.over_budget(req.requester, float(budget.month_to_date), float(budget.cap))
+        )
+
     owner, name = req.repo.full_name.split("/", 1)
     client = github.installation_client(creds, req.installation.github_id)
     pr = (await client.rest.pulls.async_get(owner, name, req.pr_number)).parsed_data

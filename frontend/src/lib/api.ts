@@ -126,6 +126,8 @@ export type AdminSettings = {
   anthropic_api_key: { set: boolean; hint: string; from_env: boolean }
   default_model: string
   max_usd_per_review: number
+  monthly_cap_usd: number | null
+  spend_this_month: number
   reviewers_repo: string
 }
 

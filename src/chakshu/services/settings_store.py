@@ -29,6 +29,7 @@ class Key(StrEnum):
     ANTHROPIC_API_KEY = "anthropic.api_key"
     DEFAULT_MODEL = "review.default_model"
     MAX_USD_PER_REVIEW = "review.max_usd"
+    MONTHLY_CAP_USD = "review.monthly_cap_usd"
 
 
 SECRET_KEYS = frozenset(

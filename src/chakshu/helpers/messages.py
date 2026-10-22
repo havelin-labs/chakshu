@@ -26,5 +26,13 @@ def nothing_matched(login: str | None, owners: Iterable[tuple[str, str]]) -> str
     )
 
 
+def over_budget(login: str | None, spent: float, cap: float) -> str:
+    who = f"@{login} " if login else ""
+    return (
+        f"{MARKER}\n{who}reviews are paused: this month's spend (${spent:.2f}) has reached the "
+        f"${cap:.2f} cap. An admin can raise it in Chakshu's settings."
+    )
+
+
 def queued(names: Iterable[str]) -> str:
     return f"{MARKER}\nQueued: " + ", ".join(f"`{n}`" for n in names)
