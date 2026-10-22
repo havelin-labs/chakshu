@@ -43,8 +43,9 @@ export function WebhooksCard({ webhooks }: { webhooks: AdminSettings["webhooks"]
         {connect.isSuccess && (
           <Notice>
             Done. On GitHub, open the app's settings (the owner's Settings, Developer settings, GitHub Apps
-            {session?.app && <>, {session.app.slug}</>}), make sure <b>Webhook: Active</b> is ticked, and under{" "}
-            <b>Permissions &amp; events</b> subscribe to {webhooks.events.join(", ")}.
+            {session?.app && <>, {session.app.slug}</>}). Check that <b>Webhook: Active</b> is ticked, then under{" "}
+            <b>Permissions &amp; events</b> subscribe to {webhooks.events.join(", ")} and save. GitHub only lets you
+            pick events while the webhook is active.
           </Notice>
         )}
         <Button onClick={() => connect.mutate()} disabled={!webhooks.public || connect.isPending}>
