@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom"
 
 import { Layout } from "@/components/layout"
 import { RequireUser } from "@/components/require-user"
+import { InsightsPage } from "@/pages/insights-page"
 import { LoginPage } from "@/pages/login-page"
 import { RepoPage } from "@/pages/repo-page"
 import { ReposPage } from "@/pages/repos-page"
@@ -25,6 +26,7 @@ const router = createBrowserRouter([
       { path: "/repos", element: signedIn(<ReposPage />) },
       { path: "/repos/:id", element: signedIn(<RepoPage />) },
       { path: "/reviewers", element: signedIn(<ReviewersPage />) },
+      { path: "/insights", element: signedIn(<InsightsPage />) },
       { path: "/settings", element: signedIn(<SettingsPage />, true) },
       { path: "/status", element: signedIn(<StatusPage />) },
       { path: "/login", element: <LoginPage /> },

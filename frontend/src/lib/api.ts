@@ -133,6 +133,17 @@ export type AdminSettings = {
   reviewers_repo: string
 }
 
+export type SkillStat = {
+  account: string
+  reviewer: string
+  skill: string
+  posted: number
+  fixed: number
+  dismissed: number
+  open: number
+  fix_rate: number | null
+}
+
 export type FailedEvent = {
   id: string
   event: string
