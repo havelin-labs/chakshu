@@ -106,6 +106,7 @@ export function RunPage() {
                     {data.result.posted} posted inline, {data.result.summary_only} in the summary, {data.result.repeats}{" "}
                     already on the PR
                     {data.result.since && `. Reviewed only the changes since ${shortSha(data.result.since)}`}
+                    {data.result.resolved ? `. Resolved ${data.result.resolved} outdated thread(s)` : null}
                   </p>
                 </div>
                 <div>
