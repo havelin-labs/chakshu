@@ -66,10 +66,12 @@ function ClaimStep() {
 
 function CreateAppStep({ webhooks }: { webhooks: boolean }) {
   const [org, setOrg] = useState("")
+  const [personal, setPersonal] = useState(false)
   const [name, setName] = useState("")
-  const suggested = org ? `chakshu-${org}` : "chakshu"
+  const owner = personal ? "" : org.trim()
+  const suggested = owner ? `chakshu-${owner}` : "chakshu"
   const create = useMutation({
-    mutationFn: () => apiPost<ManifestResponse>("/api/setup/manifest", { org, name: name || suggested }),
+    mutationFn: () => apiPost<ManifestResponse>("/api/setup/manifest", { org: owner, name: name || suggested }),
     onSuccess: postToGitHub,
   })
 
@@ -80,11 +82,34 @@ function CreateAppStep({ webhooks }: { webhooks: boolean }) {
 
   return (
     <form onSubmit={submit} className="space-y-5">
-      <div className="space-y-2">
-        <Label htmlFor="org">GitHub organization</Label>
-        <Input id="org" value={org} onChange={(e) => setOrg(e.target.value)} placeholder="acme" className="max-w-sm" />
-        <p className="text-sm text-muted-foreground">Leave empty to create the app under your personal account.</p>
-      </div>
+      {!personal && (
+        <div className="space-y-2">
+          <Label htmlFor="org">GitHub organization</Label>
+          <Input id="org" value={org} onChange={(e) => setOrg(e.target.value)} placeholder="acme" className="max-w-sm" />
+          <p className="text-sm text-muted-foreground">
+            The org whose repositories Chakshu will review. You need to be an owner of it. Use the org's login as it
+            appears in its URL, e.g. <code className="font-mono">github.com/acme</code>.
+          </p>
+        </div>
+      )}
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={personal}
+          onChange={(e) => setPersonal(e.target.checked)}
+        />
+        <span>
+          Create it under my personal account instead
+          {personal && (
+            <span className="mt-1 block text-muted-foreground">
+              The app stays private, so it can only be installed on your personal account and only your own
+              repositories can be reviewed. To use it with an org later, transfer the app to the org from its GitHub
+              settings (Advanced, Transfer ownership).
+            </span>
+          )}
+        </span>
+      </label>
       <div className="space-y-2">
         <Label htmlFor="name">App name</Label>
         <Input
@@ -104,7 +129,7 @@ function CreateAppStep({ webhooks }: { webhooks: boolean }) {
         </Notice>
       )}
       <ErrorNotice error={create.error} />
-      <Button type="submit" disabled={create.isPending}>
+      <Button type="submit" disabled={create.isPending || (!personal && !org.trim())}>
         Create on GitHub
       </Button>
     </form>
