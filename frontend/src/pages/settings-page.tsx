@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { apiGet, apiPut, type AdminSettings } from "@/lib/api"
+import { cost } from "@/lib/format"
 
 function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -22,7 +23,12 @@ function Field({ id, label, hint, children }: { id: string; label: string; hint?
 export function SettingsPage() {
   const queryClient = useQueryClient()
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => apiGet<AdminSettings>("/api/settings") })
-  const [form, setForm] = useState({ default_model: "", max_usd_per_review: "", reviewers_repo: "" })
+  const [form, setForm] = useState({
+    default_model: "",
+    max_usd_per_review: "",
+    monthly_cap_usd: "",
+    reviewers_repo: "",
+  })
   const [apiKey, setApiKey] = useState("")
 
   useEffect(() => {
@@ -30,6 +36,7 @@ export function SettingsPage() {
       setForm({
         default_model: settings.data.default_model,
         max_usd_per_review: String(settings.data.max_usd_per_review),
+        monthly_cap_usd: settings.data.monthly_cap_usd == null ? "" : String(settings.data.monthly_cap_usd),
         reviewers_repo: settings.data.reviewers_repo,
       })
     }
@@ -40,6 +47,7 @@ export function SettingsPage() {
       apiPut<AdminSettings>("/api/settings", {
         ...form,
         max_usd_per_review: Number(form.max_usd_per_review),
+        monthly_cap_usd: form.monthly_cap_usd ? Number(form.monthly_cap_usd) : null,
         anthropic_api_key: apiKey ? apiKey : null,
       }),
     onSuccess: (data) => {
@@ -95,6 +103,21 @@ export function SettingsPage() {
                 step="0.1"
                 value={form.max_usd_per_review}
                 onChange={update("max_usd_per_review")}
+                className="max-w-32"
+              />
+            </Field>
+            <Field
+              id="monthly-cap"
+              label="Monthly spend cap (USD)"
+              hint={`Spent this month: ${cost(settings.data?.spend_this_month ?? null)}. New reviews are refused once this is reached. Leave empty for no cap.`}
+            >
+              <Input
+                id="monthly-cap"
+                type="number"
+                min="1"
+                step="1"
+                value={form.monthly_cap_usd}
+                onChange={update("monthly_cap_usd")}
                 className="max-w-32"
               />
             </Field>
