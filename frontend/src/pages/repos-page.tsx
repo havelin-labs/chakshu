@@ -4,10 +4,10 @@ import { Link } from "react-router-dom"
 import { ErrorNotice, Notice } from "@/components/notice"
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useSession } from "@/hooks/use-session"
-import { apiGet, apiPut, type Repo } from "@/lib/api"
+import { apiGet, apiPost, apiPut, type Repo } from "@/lib/api"
 
 export function ReposPage() {
   const { data: session } = useSession()
@@ -17,17 +17,42 @@ export function ReposPage() {
     mutationFn: (repo: Repo) => apiPut(`/api/repos/${repo.id}`, { enabled: !repo.enabled }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["repos"] }),
   })
+  const sync = useMutation({
+    mutationFn: () => apiPost("/api/repos/sync"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["repos"] }),
+  })
   const isAdmin = Boolean(session?.user?.is_admin)
+  const installUrl = session?.app?.install_url
 
   return (
     <section>
-      <PageHeader eyebrow="Repositories" title="Repositories Chakshu can see">
+      <PageHeader
+        eyebrow="Repositories"
+        title="Repositories Chakshu can see"
+        actions={
+          isAdmin && (
+            <div className="flex flex-wrap gap-2">
+              {installUrl && (
+                <a className={buttonVariants({ variant: "outline" })} href={installUrl} target="_blank" rel="noreferrer">
+                  Change repository access
+                </a>
+              )}
+              <Button onClick={() => sync.mutate()} disabled={sync.isPending}>
+                {sync.isPending ? "Syncing…" : "Sync repositories"}
+              </Button>
+            </div>
+          )
+        }
+      >
         These come from the GitHub App installation. Open one to review a pull request from here.
       </PageHeader>
       <div className="space-y-4">
-        <ErrorNotice error={repos.error ?? toggle.error} />
+        <ErrorNotice error={repos.error ?? toggle.error ?? sync.error} />
         {repos.data?.length === 0 && (
-          <Notice>No repositories yet. Give the Chakshu app access to some on GitHub, then run setup sync.</Notice>
+          <Notice>
+            No repositories yet. Use <b>Change repository access</b> to give the Chakshu app some repositories on
+            GitHub, then press <b>Sync repositories</b>.
+          </Notice>
         )}
         <Card>
           <CardContent className="divide-y">
