@@ -22,6 +22,45 @@ function Field({ id, label, hint, children }: { id: string; label: string; hint?
   )
 }
 
+const ACCESS_LABEL: Record<AdminSettings["access"], string> = {
+  api_key: "API key",
+  subscription: "subscription token",
+  environment: "container environment",
+  none: "nothing set yet",
+}
+
+type SecretStatus = { set: boolean; hint: string; from_env: boolean }
+
+function SecretField(props: {
+  id: string
+  label: string
+  placeholder: string
+  envName: string
+  emptyHint: string
+  status: SecretStatus | undefined
+  value: string
+  onChange: (value: string) => void
+}) {
+  const { status } = props
+  const hint = status?.set
+    ? `Saved (${status.hint}). Type a new one to replace it.`
+    : status?.from_env
+      ? `Using ${props.envName} from the container environment.`
+      : `${props.emptyHint} Stored encrypted.`
+  return (
+    <Field id={props.id} label={props.label} hint={hint}>
+      <Input
+        id={props.id}
+        type="password"
+        autoComplete="off"
+        value={props.value}
+        onChange={(e) => props.onChange(e.target.value)}
+        placeholder={props.placeholder}
+      />
+    </Field>
+  )
+}
+
 export function SettingsPage() {
   const queryClient = useQueryClient()
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => apiGet<AdminSettings>("/api/settings") })
@@ -31,7 +70,7 @@ export function SettingsPage() {
     monthly_cap_usd: "",
     reviewers_repo: "",
   })
-  const [apiKey, setApiKey] = useState("")
+  const [secrets, setSecrets] = useState({ anthropic_api_key: "", claude_oauth_token: "" })
 
   useEffect(() => {
     if (settings.data) {
@@ -50,10 +89,12 @@ export function SettingsPage() {
         ...form,
         max_usd_per_review: Number(form.max_usd_per_review),
         monthly_cap_usd: form.monthly_cap_usd ? Number(form.monthly_cap_usd) : null,
-        anthropic_api_key: apiKey ? apiKey : null,
+        // Only send secrets that were typed; empty means "keep what's saved".
+        anthropic_api_key: secrets.anthropic_api_key || null,
+        claude_oauth_token: secrets.claude_oauth_token || null,
       }),
     onSuccess: (data) => {
-      setApiKey("")
+      setSecrets({ anthropic_api_key: "", claude_oauth_token: "" })
       queryClient.setQueryData(["settings"], data)
     },
   })
@@ -63,7 +104,11 @@ export function SettingsPage() {
     event.preventDefault()
     save.mutate()
   }
-  const key = settings.data?.anthropic_api_key
+  const secretField = (name: keyof typeof secrets) => ({
+    status: settings.data?.[name],
+    value: secrets[name],
+    onChange: (value: string) => setSecrets({ ...secrets, [name]: value }),
+  })
 
   return (
     <section className="max-w-2xl">
@@ -74,26 +119,35 @@ export function SettingsPage() {
       <Card>
         <CardContent>
           <form onSubmit={submit} className="space-y-6">
-            <Field
-              id="api-key"
-              label="Anthropic API key"
-              hint={
-                key?.set
-                  ? `Saved (${key.hint}). Type a new key to replace it.`
-                  : key?.from_env
-                    ? "Using ANTHROPIC_API_KEY from the container environment."
-                    : "Required before reviews can run. Stored encrypted."
-              }
-            >
-              <Input
+            <div className="space-y-4 rounded-[4px] border p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base font-semibold">Claude access</h2>
+                <span className="text-xs text-muted-foreground">Reviews use: {ACCESS_LABEL[settings.data?.access ?? "none"]}</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Set one. If both are set, the API key is used.
+              </p>
+              <SecretField
                 id="api-key"
-                type="password"
-                autoComplete="off"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-ant-..."
+                label="Anthropic API key"
+                placeholder="sk-ant-api..."
+                envName="ANTHROPIC_API_KEY"
+                emptyHint="From console.anthropic.com. Paid from your Console credits."
+                {...secretField("anthropic_api_key")}
               />
-            </Field>
+              <SecretField
+                id="oauth-token"
+                label="Claude subscription token"
+                placeholder="sk-ant-oat..."
+                envName="CLAUDE_CODE_OAUTH_TOKEN"
+                emptyHint="Run claude setup-token with a Pro or Max account and paste the token. Reviews then count against that person's subscription limits."
+                {...secretField("claude_oauth_token")}
+              />
+              <Notice>
+                Anthropic's terms restrict using claude.ai subscriptions in third-party products. Check that your use is
+                allowed before relying on a subscription token, and prefer an API key for shared or production use.
+              </Notice>
+            </div>
             <Field id="model" label="Default model" hint="Model alias (sonnet, opus, haiku) or a full model name.">
               <Input id="model" value={form.default_model} onChange={update("default_model")} className="max-w-xs" />
             </Field>
