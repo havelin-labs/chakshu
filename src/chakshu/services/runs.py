@@ -26,6 +26,22 @@ def work_key(ns: uuid.UUID, repo: Repo, pr_number: int, head_sha: str, reviewer:
     return ids.eid(ns, "work", pr_key(ns, repo, pr_number), head_sha, reviewer.source_sha, reviewer.id)
 
 
+async def last_reviewed_head(session: AsyncSession, run: Run) -> str | None:
+    """Head commit of this reviewer's latest successful review of the same PR at another commit."""
+    return await session.scalar(
+        select(Run.head_sha)
+        .where(
+            Run.repo_id == run.repo_id,
+            Run.pr_number == run.pr_number,
+            Run.reviewer_id == run.reviewer_id,
+            Run.status == RunStatus.SUCCEEDED.value,
+            Run.head_sha != run.head_sha,
+        )
+        .order_by(Run.finished_at.desc())
+        .limit(1)
+    )
+
+
 async def enqueue(
     session: AsyncSession,
     creds: AppCredentials,
