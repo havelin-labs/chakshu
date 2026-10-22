@@ -29,6 +29,7 @@ from chakshu.services import (
     engine,
     finding_stats,
     github,
+    model_access,
     publisher,
     queue,
     runs,
@@ -54,11 +55,14 @@ def _transient(exc: Exception) -> bool:
     return isinstance(exc, httpx.TransportError | GitError)
 
 
-async def _review_settings(session: AsyncSession, reviewer: Reviewer) -> tuple[str, float, str | None]:
-    values = await store.get_many(session, Key.DEFAULT_MODEL, Key.MAX_USD_PER_REVIEW, Key.ANTHROPIC_API_KEY)
+async def _review_settings(session: AsyncSession, reviewer: Reviewer) -> tuple[str, float, dict[str, str]]:
+    values = await store.get_many(session, Key.DEFAULT_MODEL, Key.MAX_USD_PER_REVIEW)
     model = reviewer.model or values[Key.DEFAULT_MODEL] or "sonnet"
     max_usd = float(reviewer.limits.get("max_usd") or values[Key.MAX_USD_PER_REVIEW] or 2)
-    return model, max_usd, values[Key.ANTHROPIC_API_KEY]
+    access = await model_access.current(session)
+    if access.kind == "none":
+        raise RuntimeError("No Claude access set up. Add an API key or a subscription token in Settings.")
+    return model, max_usd, access.env
 
 
 async def _changes_since(
@@ -105,7 +109,7 @@ async def _execute(
     reviewers_repo = await catalog.reviewers_repo(session, installation)
     if reviewers_repo is None:
         raise RuntimeError("The reviewers repo is no longer visible to the app.")
-    model, max_usd, api_key = await _review_settings(session, reviewer)
+    model, max_usd, auth_env = await _review_settings(session, reviewer)
     run.model = model
     toolsets = await connectors.toolsets_for(
         session, reviewer.connectors, "\n".join([pr.title, pr.head.ref, pr.body or ""])
@@ -141,7 +145,7 @@ async def _execute(
             hints=[t.prompt_hint for t in toolsets],
         )
         result = await engine.review(
-            ws.root, prompt, model=model, max_usd=max_usd, api_key=api_key, toolsets=toolsets
+            ws.root, prompt, model=model, max_usd=max_usd, auth_env=auth_env, toolsets=toolsets
         )
 
     run.cost_usd = Decimal(str(result.cost_usd)) if result.cost_usd is not None else None

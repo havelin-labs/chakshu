@@ -27,6 +27,7 @@ class Key(StrEnum):
     APP_OWNER = "github.owner"
     REVIEWERS_REPO = "reviewers.repo"
     ANTHROPIC_API_KEY = "anthropic.api_key"
+    CLAUDE_OAUTH_TOKEN = "anthropic.oauth_token"
     DEFAULT_MODEL = "review.default_model"
     MAX_USD_PER_REVIEW = "review.max_usd"
     MONTHLY_CAP_USD = "review.monthly_cap_usd"
@@ -39,6 +40,7 @@ SECRET_KEYS = frozenset(
         Key.APP_PRIVATE_KEY,
         Key.APP_WEBHOOK_SECRET,
         Key.ANTHROPIC_API_KEY,
+        Key.CLAUDE_OAUTH_TOKEN,
     }
 )
 
