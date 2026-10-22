@@ -139,6 +139,8 @@ export type ReviewOutcome = { queued: string[]; already: string[]; refused: stri
 
 export type AdminSettings = {
   anthropic_api_key: { set: boolean; hint: string; from_env: boolean }
+  claude_oauth_token: { set: boolean; hint: string; from_env: boolean }
+  access: "api_key" | "subscription" | "environment" | "none"
   default_model: string
   max_usd_per_review: number
   monthly_cap_usd: number | null
