@@ -3,25 +3,15 @@ import { useEffect, useState, type FormEvent } from "react"
 
 import { ActionsCard } from "@/components/actions-card"
 import { ConnectorsCard } from "@/components/connectors-card"
+import { Field } from "@/components/field"
 import { WebhooksCard } from "@/components/webhooks-card"
 import { ErrorNotice, Notice } from "@/components/notice"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { apiGet, apiPut, type AdminSettings } from "@/lib/api"
 import { cost } from "@/lib/format"
-
-function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      {children}
-      {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
-    </div>
-  )
-}
 
 const ACCESS_LABEL: Record<AdminSettings["access"], string> = {
   api_key: "API key",
