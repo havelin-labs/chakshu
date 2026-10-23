@@ -78,7 +78,9 @@ async def request_review(session: AsyncSession, creds: AppCredentials, req: Revi
 
     files = [
         f.filename
-        async for f in client.rest.paginate(client.rest.pulls.async_list_files, owner, name, req.pr_number)
+        async for f in client.rest.paginate(
+            client.rest.pulls.async_list_files, owner=owner, repo=name, pull_number=req.pr_number
+        )
     ]
     reviewers = list(
         (await session.scalars(select(Reviewer).where(Reviewer.installation_id == req.installation.id))).all()

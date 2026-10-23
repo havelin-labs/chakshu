@@ -100,7 +100,9 @@ async def _execute(
 
     files = [
         (f.filename, f.patch)
-        async for f in client.rest.paginate(client.rest.pulls.async_list_files, owner, name, run.pr_number)
+        async for f in client.rest.paginate(
+            client.rest.pulls.async_list_files, owner=owner, repo=name, pull_number=run.pr_number
+        )
     ]
     since = await runs.last_reviewed_head(session, run)
     new_files = await _changes_since(client, owner, name, since, run.head_sha) if since else None
