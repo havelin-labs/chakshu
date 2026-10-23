@@ -5,15 +5,16 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from githubkit.exception import RequestFailed
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from chakshu.api.deps import AdminDep, CredentialsDep, csrf_protect
 from chakshu.core import crypto
 from chakshu.core.config import get_settings as get_config
 from chakshu.db.session import SessionDep
+from chakshu.helpers import analytics as calc
 from chakshu.helpers import workflow
 from chakshu.helpers.urls import is_public_url
-from chakshu.services import actions_secrets, app_permissions, github, model_access, setup, spend
+from chakshu.services import actions_secrets, analytics, app_permissions, github, model_access, setup, spend
 from chakshu.services import settings_store as store
 from chakshu.services.settings_store import Key
 
@@ -136,3 +137,43 @@ async def connect_webhooks(session: SessionDep, creds: CredentialsDep, _: AdminD
             status.HTTP_502_BAD_GATEWAY, f"GitHub refused the webhook settings ({exc.response.status_code})."
         ) from exc
     return {"url": url}
+
+
+class AnalyticsSettingsUpdate(BaseModel):
+    show_names: bool | None = None
+    min_group: int | None = None
+
+    @field_validator("min_group")
+    @classmethod
+    def _min_group(cls, value: int | None) -> int | None:
+        if value is not None and not calc.valid_min_group(value):
+            raise ValueError(
+                f"Use {calc.MIN_GROUP_OFF} to show every group, "
+                f"or a group size from {calc.MIN_GROUP_FLOOR} to {calc.MIN_GROUP_MAX}."
+            )
+        return value
+
+
+@router.get("/analytics")
+async def get_analytics_settings(session: SessionDep, _: AdminDep) -> dict:
+    return asdict(await analytics.privacy(session))
+
+
+@router.patch("/analytics")
+async def update_analytics_settings(
+    body: AnalyticsSettingsUpdate, session: SessionDep, user: AdminDep
+) -> dict:
+    """Name people in analytics or not, and the smallest group shown (1 turns hiding off). Audited."""
+    old = asdict(await analytics.privacy(session))
+    new = old | body.model_dump(exclude_none=True)
+    await store.put_many(
+        session,
+        {
+            Key.ANALYTICS_SHOW_NAMES: "true" if new["show_names"] else "false",
+            Key.ANALYTICS_MIN_GROUP: str(new["min_group"]),
+        },
+    )
+    await analytics.record_access(
+        session, user.login, "settings.analytics.update", "settings", {"old": old, "new": new}
+    )
+    return new

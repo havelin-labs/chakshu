@@ -37,6 +37,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export const apiGet = <T>(path: string) => request<T>("GET", path)
 export const apiPost = <T>(path: string, body: unknown = {}) => request<T>("POST", path, body)
 export const apiPut = <T>(path: string, body: unknown = {}) => request<T>("PUT", path, body)
+export const apiPatch = <T>(path: string, body: unknown = {}) => request<T>("PATCH", path, body)
 export const apiDelete = <T>(path: string) => request<T>("DELETE", path)
 
 export type ConnectorList = {
@@ -286,7 +287,35 @@ export type PersonRow = {
   cost_triggered: number
 }
 
-export type PeopleResult = { hidden: "names_off" | "small_group" | null; min_group: number; rows: PersonRow[] }
+export type ActivityState = "engaged" | "auto_only" | "none"
+export type HiddenReason = "names_off" | "small_group"
+
+// One card in the People directory.
+export type DirectoryRow = PersonRow & {
+  avatar_url: string | null
+  org_role: "owner" | "member" | null
+  in_org: boolean
+  is_portal_admin: boolean
+  last_login_at: string | null
+  activity_state: ActivityState
+  last_activity_at: string | null
+}
+
+export type Period = { days: number; from: string; to: string }
+export type MembersSource = { synced_at: string | null; stale: boolean }
+
+export type PeopleResult = {
+  hidden: boolean
+  hidden_reason: HiddenReason | null
+  min_group: number
+  period: Period
+  members_source: MembersSource
+  total: number
+  page: number
+  page_size: number
+  counts: Record<ActivityState | "all" | "not_in_org", number> | null
+  rows: DirectoryRow[]
+}
 
 export type CostView = {
   forecast: { month_to_date: number; projected: number; cap: number | null; cap_hit_on: string | null }
