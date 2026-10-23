@@ -1,13 +1,15 @@
 import uuid
+from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from githubkit.exception import RequestFailed
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from chakshu.api.deps import AdminDep, CredentialsDep, UserDep, csrf_protect
 from chakshu.db.models import Installation, Repo
 from chakshu.db.session import SessionDep
-from chakshu.services import github, installations, triggers
+from chakshu.services import github, installations, repo_setup, triggers
 
 router = APIRouter(prefix="/api/repos", tags=["repos"], dependencies=[Depends(csrf_protect)])
 
@@ -55,6 +57,36 @@ async def update_repo(repo_id: uuid.UUID, body: RepoUpdate, session: SessionDep,
     repo.enabled = body.enabled
     await session.commit()
     return {"id": str(repo.id), "enabled": repo.enabled}
+
+
+def _actions(status: repo_setup.ActionsStatus) -> dict:
+    return asdict(status) | {"ready": status.ready}
+
+
+@router.get("/{repo_id}/actions")
+async def actions_status(repo_id: uuid.UUID, session: SessionDep, creds: CredentialsDep, _: UserDep) -> dict:
+    """Is this repo ready to run reviews in GitHub Actions: workflow file and Claude secrets."""
+    repo, installation = await _load(session, repo_id)
+    client = github.installation_client(creds, installation.github_id)
+    return _actions(await repo_setup.status(session, client, repo))
+
+
+@router.post("/{repo_id}/actions")
+async def set_up_actions(
+    repo_id: uuid.UUID, session: SessionDep, creds: CredentialsDep, user: AdminDep
+) -> dict:
+    """Open a PR with the workflow (if it's missing or old) and write the Claude secrets."""
+    repo, installation = await _load(session, repo_id)
+    client = github.installation_client(creds, installation.github_id)
+    try:
+        result = await repo_setup.set_up(session, client, repo, user.login)
+    except RequestFailed as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            f"GitHub refused ({exc.response.status_code}). The app may be missing the contents, "
+            "workflows or secrets permission; Settings shows what's missing.",
+        ) from exc
+    return _actions(result)
 
 
 @router.get("/{repo_id}/pulls")
