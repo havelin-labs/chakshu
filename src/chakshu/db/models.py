@@ -11,7 +11,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, Numeric, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -156,6 +156,9 @@ class Run(Base, JobMixin, TimestampMixin):
     __table_args__ = (
         Index("ix_runs_status_created_at", "status", "created_at"),
         Index("ix_runs_created_at_repo_id", "created_at", "repo_id"),
+        # People views match logins case-insensitively.
+        Index("ix_runs_lower_requested_by_created_at", text("lower(requested_by)"), "created_at"),
+        Index("ix_runs_lower_pr_author_created_at", text("lower(pr_author)"), "created_at"),
     )
 
 
@@ -210,10 +213,33 @@ class AnalyticsAudit(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     user_login: Mapped[str] = mapped_column(String(100))
-    action: Mapped[str] = mapped_column(String(20))  # view | export
+    # people.directory.view, people.detail.view, people.activity.view, people.export,
+    # settings.analytics.update (old and new values in `filters`)
+    action: Mapped[str] = mapped_column(String(50))
     view: Mapped[str] = mapped_column(String(50))
     filters: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    # Whose page was opened, for views of one person.
+    target_login: Mapped[str | None] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class OrgMember(Base):
+    """Everyone in the installed organizations, as GitHub last listed them. Feeds the People directory.
+
+    Rows stay when someone leaves (`in_org` turns false), so their history keeps a name and avatar.
+    """
+
+    __tablename__ = "org_members"
+
+    login: Mapped[str] = mapped_column(String(100), primary_key=True)  # as GitHub returns it
+    login_lower: Mapped[str] = mapped_column(String(100), unique=True)
+    name: Mapped[str | None] = mapped_column(String(200))
+    avatar_url: Mapped[str | None] = mapped_column(String(500))
+    org_role: Mapped[str] = mapped_column(String(10))  # owner | member
+    in_org: Mapped[bool] = mapped_column(Boolean, default=True)
+    # When the display name was last asked for (GET /users/{login}), so it's refreshed at most daily.
+    name_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class WebhookEvent(Base, JobMixin, TimestampMixin):
