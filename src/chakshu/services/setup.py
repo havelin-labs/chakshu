@@ -21,13 +21,16 @@ from chakshu.services.settings_store import Key
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 APP_PERMISSIONS = {
-    "contents": "read",
+    # write: open pull requests with the workflow and with reviewer changes; never pushes to a default branch
+    "contents": "write",
     "pull_requests": "write",
     "checks": "write",
     "issues": "write",
     "members": "read",
     "metadata": "read",
     "actions": "write",  # start the review workflow and hear when it ends
+    "workflows": "write",  # propose .github/workflows/chakshu.yml
+    "secrets": "write",  # keep the Claude credential in each repo's Actions secrets
 }
 APP_EVENTS = ["pull_request", "issue_comment", "push", "workflow_run"]
 

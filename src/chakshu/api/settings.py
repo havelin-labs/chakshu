@@ -1,6 +1,7 @@
 """Admin settings. Secrets are write-only: the API returns whether they're set and a masked hint."""
 
 import os
+from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from githubkit.exception import RequestFailed
@@ -10,7 +11,8 @@ from chakshu.api.deps import AdminDep, CredentialsDep, csrf_protect
 from chakshu.core import crypto
 from chakshu.core.config import get_settings as get_config
 from chakshu.db.session import SessionDep
-from chakshu.services import model_access, setup, spend
+from chakshu.helpers import workflow
+from chakshu.services import actions_secrets, app_permissions, github, model_access, setup, spend
 from chakshu.services import settings_store as store
 from chakshu.services.settings_store import Key
 
@@ -26,6 +28,8 @@ class SettingsUpdate(BaseModel):
     # None means no monthly cap.
     monthly_cap_usd: float | None = Field(default=None, gt=0, le=1_000_000)
     reviewers_repo: str = Field(pattern=r"^[A-Za-z0-9._-]{1,100}$")
+    # owner/repo@ref of the action the review workflow runs; None keeps the current one.
+    actions_action: str | None = Field(default=None, pattern=r"^[\w.-]+/[\w.-]+(/[\w./-]+)?@[\w./-]+$")
 
 
 # Write-only secrets: request field -> (setting, environment variable that can stand in for it)
@@ -45,6 +49,7 @@ async def _read(session: SessionDep) -> dict:
         Key.DEFAULT_MODEL,
         Key.MAX_USD_PER_REVIEW,
         Key.REVIEWERS_REPO,
+        Key.ACTIONS_ACTION,
         *(key for key, _ in SECRETS.values()),
     )
     budget = await spend.current(session)
@@ -56,6 +61,8 @@ async def _read(session: SessionDep) -> dict:
         "monthly_cap_usd": float(budget.cap) if budget.cap is not None else None,
         "spend_this_month": float(budget.month_to_date),
         "reviewers_repo": values[Key.REVIEWERS_REPO],
+        "actions_action": values[Key.ACTIONS_ACTION] or workflow.DEFAULT_ACTION,
+        "runner_url": get_config().public_runner_url,
         "webhooks": {
             "url": get_config().hook_url,
             "public": setup.webhooks_reachable(),
@@ -78,13 +85,35 @@ async def update_settings(body: SettingsUpdate, session: SessionDep, _: AdminDep
         Key.MONTHLY_CAP_USD: str(body.monthly_cap_usd) if body.monthly_cap_usd else None,
         Key.REVIEWERS_REPO: body.reviewers_repo.strip(),
     }
+    if body.actions_action:
+        values[Key.ACTIONS_ACTION] = body.actions_action
+    changed_secret = False
     for field, (key, _) in SECRETS.items():
         submitted = getattr(body, field)
         if submitted is not None:
             values[key] = submitted.strip() or None
+            changed_secret = True
     await store.put_many(session, values)
     await session.commit()
-    return await _read(session)
+    result = await _read(session)
+    creds = await github.load_credentials(session)
+    if changed_secret and creds:
+        # Reviews run in Actions with these as repository secrets, so a change goes out at once.
+        result["secrets_sync"] = asdict(await actions_secrets.sync_all(session, creds))
+    return result
+
+
+@router.post("/actions/secrets")
+async def sync_secrets(session: SessionDep, creds: CredentialsDep, _: AdminDep) -> dict:
+    """Copy the Claude credential into every enabled repository's Actions secrets."""
+    return asdict(await actions_secrets.sync_all(session, creds))
+
+
+@router.get("/permissions")
+async def permissions(session: SessionDep, creds: CredentialsDep, _: AdminDep) -> dict:
+    """What the GitHub App is missing, in its own settings and in each installation."""
+    report = await app_permissions.check(session, creds)
+    return asdict(report) | {"ok": report.ok}
 
 
 @router.post("/webhooks")

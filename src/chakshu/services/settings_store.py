@@ -31,6 +31,7 @@ class Key(StrEnum):
     DEFAULT_MODEL = "review.default_model"
     MAX_USD_PER_REVIEW = "review.max_usd"
     MONTHLY_CAP_USD = "review.monthly_cap_usd"
+    ACTIONS_ACTION = "actions.action"  # owner/repo@ref of the action the workflow runs
 
 
 SECRET_KEYS = frozenset(
