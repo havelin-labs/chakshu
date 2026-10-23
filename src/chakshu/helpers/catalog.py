@@ -78,7 +78,7 @@ def skill_dir(root: Path, folder: str, skill: str) -> Path:
     return root / REVIEWERS_DIR / folder / "skills" / skill
 
 
-def _format_validation(exc: ValidationError) -> list[str]:
+def validation_errors(exc: ValidationError) -> list[str]:
     return [
         f"{'.'.join(str(p) for p in err['loc']) or 'reviewer.yaml'}: {err['msg']}" for err in exc.errors()
     ]
@@ -97,7 +97,7 @@ def parse_reviewer(root: Path, folder: Path) -> ParsedReviewer:
         parsed.errors.append(f"reviewer.yaml isn't valid YAML: {exc}")
         return parsed
     except ValidationError as exc:
-        parsed.errors.extend(_format_validation(exc))
+        parsed.errors.extend(validation_errors(exc))
         return parsed
 
     spec = parsed.spec
