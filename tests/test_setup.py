@@ -67,3 +67,7 @@ async def test_claim_rejects_wrong_code_and_requires_csrf(client, db):
         "/api/setup/claim", json={"code": "WRONG-CODE"}, headers={"X-CSRF-Token": session["csrf_token"]}
     )
     assert wrong.status_code == 403
+
+
+def test_normalize_code_strips_dashes_spaces_and_case():
+    assert setup.normalize_code(" abcd-efgh ") == "ABCDEFGH"
