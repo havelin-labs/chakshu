@@ -102,6 +102,7 @@ async def request_review(session: AsyncSession, creds: AppCredentials, req: Revi
             source_id=req.source_id,
             requested_by=req.requester,
             note=note or None,
+            pr_author=pr.user.login if pr.user else None,
         )
         (outcome.queued if added else outcome.already).append(reviewer.name)
     log.info(

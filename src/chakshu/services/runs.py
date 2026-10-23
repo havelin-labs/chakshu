@@ -62,6 +62,7 @@ async def enqueue(
     requested_by: str | None,
     note: str | None,
     reply_to: int | None = None,
+    pr_author: str | None = None,
 ) -> bool:
     """Queue a run. False if the same work is already queued, running or done.
 
@@ -93,6 +94,7 @@ async def enqueue(
             note=(note or None) and note[:2000],
             status=RunStatus.QUEUED.value,
             reply_to=reply_to,
+            pr_author=pr_author,
         )
         .on_conflict_do_nothing(index_elements=[Run.id])
         .returning(Run.id)

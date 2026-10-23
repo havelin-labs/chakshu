@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from githubkit import GitHub
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from chakshu.db.models import Installation, PostedFinding, Repo, Reviewer
+from chakshu.db.models import Installation, OutcomeSource, PostedFinding, Repo, Reviewer
 from chakshu.helpers import findings, messages, replies
 from chakshu.helpers.prompt import PullRequest, ThreadComment, build_reply_prompt
 from chakshu.runner.protocol import Job, Result
@@ -92,6 +92,7 @@ async def request(session: AsyncSession, creds: AppCredentials, reply: Reply) ->
         requested_by=reply.author,
         note=None,
         reply_to=reply.root_id,
+        pr_author=reply.pr_author,
     )
     if added:
         await client.rest.reactions.async_create_for_pull_request_review_comment(
@@ -189,7 +190,7 @@ async def settle(session: AsyncSession, ctx: RunContext, outcome: str | None) ->
         if marker:
             ids = {marker.group(1)}
             fixed, dismissed = (ids, set()) if outcome == "fixed" else (set(), ids)
-            await finding_stats.record_outcomes(session, fixed, dismissed)
+            await finding_stats.record_outcomes(session, fixed, dismissed, OutcomeSource.REPLY)
         return await threads.resolve_started_by(client, ctx.repo.full_name, run.pr_number, run.reply_to)
     except Exception:  # noqa: BLE001
         log.warning("Couldn't settle thread %s on %s", run.reply_to, ctx.repo.full_name, exc_info=True)

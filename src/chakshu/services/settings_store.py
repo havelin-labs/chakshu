@@ -32,6 +32,8 @@ class Key(StrEnum):
     MAX_USD_PER_REVIEW = "review.max_usd"
     MONTHLY_CAP_USD = "review.monthly_cap_usd"
     ACTIONS_ACTION = "actions.action"  # owner/repo@ref of the action the workflow runs
+    ANALYTICS_SHOW_NAMES = "analytics.show_names"  # "true" or "false": name people in analytics
+    ANALYTICS_MIN_GROUP = "analytics.min_group"  # hide grouped numbers covering fewer people than this
 
 
 SECRET_KEYS = frozenset(
@@ -49,6 +51,8 @@ DEFAULTS: dict[Key, str] = {
     Key.REVIEWERS_REPO: "chakshu-reviewers",
     Key.DEFAULT_MODEL: "sonnet",
     Key.MAX_USD_PER_REVIEW: "2",
+    Key.ANALYTICS_SHOW_NAMES: "true",
+    Key.ANALYTICS_MIN_GROUP: "5",
 }
 
 
