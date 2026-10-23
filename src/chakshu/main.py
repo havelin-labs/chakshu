@@ -9,6 +9,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from chakshu import __version__
 from chakshu.api import (
+    alerts,
     analytics,
     auth,
     connectors,
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
         events.router,
         stats.router,
         analytics.router,
+        alerts.router,
         connectors.router,
     ):
         app.include_router(router)

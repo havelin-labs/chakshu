@@ -37,6 +37,11 @@ class Key(StrEnum):
         "analytics.min_group"  # hide grouped numbers covering fewer people than this; 1 is off
     )
     MEMBERS_SYNCED_AT = "members.synced_at"  # when the org member list last came from GitHub (ISO 8601)
+    ALERTS_WEBHOOK = "alerts.webhook"  # Slack incoming webhook for spend alerts and the digest
+    ALERTS_THRESHOLDS = "alerts.thresholds"  # percentages of the monthly cap, e.g. "50,80,100"
+    ALERTS_DIGEST = "alerts.digest"  # "true" sends a weekly digest on Mondays
+    ALERTS_SENT = "alerts.sent"  # JSON: the month and the thresholds already announced in it
+    DIGEST_SENT_WEEK = "alerts.digest_week"  # ISO week of the last digest sent
     MEMBERS_STALE = "members.stale"  # "true" when the last attempt failed and the list is older than it looks
 
 
@@ -48,6 +53,7 @@ SECRET_KEYS = frozenset(
         Key.APP_WEBHOOK_SECRET,
         Key.ANTHROPIC_API_KEY,
         Key.CLAUDE_OAUTH_TOKEN,
+        Key.ALERTS_WEBHOOK,
     }
 )
 
@@ -57,6 +63,8 @@ DEFAULTS: dict[Key, str] = {
     Key.MAX_USD_PER_REVIEW: "2",
     Key.ANALYTICS_SHOW_NAMES: "true",
     Key.ANALYTICS_MIN_GROUP: "5",
+    Key.ALERTS_THRESHOLDS: "50,80,100",
+    Key.ALERTS_DIGEST: "true",
 }
 
 
