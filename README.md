@@ -4,7 +4,7 @@
 
 Chakshu (चक्षु, Sanskrit for "the eye") is a self-hosted pull request reviewer for GitHub.
 
-Each team in your organization keeps its own reviewer: a folder with skills, rules and settings in one repo. Anyone on that team comments `@your-org/chakshu` on a pull request, and Chakshu runs the reviewers that belong to them and fit the change. Each one posts its own review and check. Reviews run in GitHub Actions in the pull request's own repository, so the logs are in its Actions tab, on the Claude Agent SDK with read-only tools.
+Each team in your organization keeps its own reviewer: a folder with skills, rules and settings in one repo. Anyone with write access comments `@your-org/chakshu` on a pull request, and Chakshu runs the reviewers that cover the changed files, or `@your-org/chakshu security` to run one by name. Each one posts its own review and check. Reviews run in GitHub Actions in the pull request's own repository, so the logs are in its Actions tab, on the Claude Agent SDK with read-only tools.
 
 Docs: https://chakshu.havelin.in/docs
 

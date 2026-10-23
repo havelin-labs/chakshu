@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from chakshu.helpers import mentions, selection
+from chakshu.helpers import mentions, messages, selection
 
 
 @dataclass
@@ -40,11 +40,34 @@ def test_auto_runs_only_opted_in_reviewers():
     assert selection.applicable(ALL, "acme/payments-api", files, event="synchronize") == []
 
 
-def test_callers_get_their_teams_reviewers_and_owners_get_all():
-    candidates = selection.applicable(ALL, "acme/payments-api", ["src/refunds/a.py", "deploy/x.yaml"])
-    assert names(selection.for_caller(candidates, {"Payments"})) == ["payments"]
-    assert names(selection.for_caller(candidates, None)) == ["payments", "platform", "default"]
-    assert selection.for_caller(candidates, {"mobile"}) == []
+@pytest.mark.parametrize(
+    ("note", "picked", "rest"),
+    [
+        ("payments platform check refunds", ["payments", "platform"], "check refunds"),
+        ("Payments, PLATFORM: check", ["payments", "platform"], "check"),
+        ("payments,platform", ["payments", "platform"], ""),
+        ("payments payments", ["payments"], ""),
+        ("check payments", [], "check payments"),
+        ("broken check", [], "broken check"),
+        ("", [], ""),
+    ],
+)
+def test_pick_named_takes_leading_reviewer_names(note, picked, rest):
+    chosen, left = selection.pick_named(ALL, note)
+    assert (names(chosen), left) == (picked, rest)
+
+
+def test_by_names_reports_unknown_and_broken_reviewers():
+    chosen, unknown = selection.by_names(ALL, ["Platform", "broken", "nope", "platform"])
+    assert names(chosen) == ["platform"]
+    assert unknown == ["broken", "nope"]
+
+
+def test_nothing_matched_explains_calling_by_name():
+    body = messages.nothing_matched("ana", "@acme/chakshu", ["payments", "platform"])
+    assert "`@acme/chakshu payments`" in body
+    assert "- `platform`" in body
+    assert "no reviewers yet" in messages.nothing_matched("ana", "@acme/chakshu", [])
 
 
 def test_fallback_is_the_healthy_default_reviewer():

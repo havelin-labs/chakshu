@@ -9,20 +9,32 @@ def needs_write_access(login: str) -> str:
     return f"{MARKER}\n@{login} only people with write access to this repository can ask for a review."
 
 
-def nothing_matched(login: str | None, owners: Iterable[tuple[str, str]]) -> str:
+def _listed(names: Iterable[str]) -> str:
+    return "\n".join(f"- `{name}`" for name in names)
+
+
+def nothing_matched(login: str | None, handle: str, names: Iterable[str]) -> str:
+    """No reviewer covers the repo and files. `names` are the reviewers that could be called by name."""
     who = f"@{login} " if login else ""
-    owners = list(owners)
-    if not owners:
+    names = list(names)
+    if not names:
         return (
-            f"{MARKER}\n{who}no reviewer covers this repository yet. "
+            f"{MARKER}\n{who}there are no reviewers yet. "
             "A team can add one in the reviewers repo; "
             "see https://chakshu.havelin.in/docs/concepts/reviewers/"
         )
-    listed = "\n".join(f"- `{name}`, owned by @{team}" for name, team in owners)
     return (
-        f"{MARKER}\n{who}none of the reviewers for this repository belong to your teams, "
-        f"and there's no `default` reviewer. These cover it:\n\n{listed}\n\n"
-        "Ask someone on one of those teams, or have your team add its own reviewer."
+        f"{MARKER}\n{who}no reviewer covers this repository and these files, "
+        f"and there's no `default` reviewer. Name one to run it anyway, "
+        f"for example `{handle} {names[0]}`. These are available:\n\n{_listed(names)}"
+    )
+
+
+def unknown_reviewers(login: str | None, unknown: Iterable[str], names: Iterable[str]) -> str:
+    who = f"@{login} " if login else ""
+    missing = ", ".join(f"`{n}`" for n in unknown)
+    return (
+        f"{MARKER}\n{who}there's no working reviewer called {missing}. Try one of these:\n\n{_listed(names)}"
     )
 
 

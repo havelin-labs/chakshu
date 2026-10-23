@@ -22,21 +22,6 @@ async def org_role(creds: AppCredentials, installation_id: int, org: str, login:
     return membership.role if membership.state == "active" else None
 
 
-async def is_team_member(
-    creds: AppCredentials, installation_id: int, org: str, team: str, login: str
-) -> bool:
-    client = github.installation_client(creds, installation_id)
-    try:
-        membership = (
-            await client.rest.teams.async_get_membership_for_user_in_org(org, team, login)
-        ).parsed_data
-    except RequestFailed as exc:
-        if exc.response.status_code in (403, 404):
-            return False
-        raise
-    return membership.state == "active"
-
-
 async def repo_permission(creds: AppCredentials, installation_id: int, full_name: str, login: str) -> str:
     """The user's permission on a repo: admin, maintain, write, triage, read or none."""
     owner, repo = full_name.split("/", 1)

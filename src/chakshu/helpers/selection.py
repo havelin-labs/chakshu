@@ -1,12 +1,15 @@
 """Which reviewers apply to a pull request. Pure functions, no I/O.
 
+People can name reviewers (`@org/chakshu security perf`), and those run whatever
+their repos and paths say. Otherwise:
+
 1. repos:  the reviewer covers this repository (glob on the repo name)
 2. paths:  at least one changed file matches (no paths means every file)
 3. event:  for automatic runs, the reviewer opted in to this PR event
-4. caller: for people asking, the reviewer belongs to one of their teams
 Nothing left and someone asked: fall back to the org's `default` reviewer.
 """
 
+import re
 from collections.abc import Iterable, Sequence
 from fnmatch import fnmatchcase
 from typing import Protocol
@@ -51,12 +54,40 @@ def applicable[R: ReviewerLike](
     ]
 
 
-def for_caller[R: ReviewerLike](candidates: Sequence[R], caller_teams: set[str] | None) -> list[R]:
-    """Step 4. `None` means the caller may run any reviewer (org owner, personal account)."""
-    if caller_teams is None:
-        return list(candidates)
-    teams = {t.lower() for t in caller_teams}
-    return [r for r in candidates if r.owner_team.lower() in teams]
+_LEADING_WORD = re.compile(r"([^\s,:]+)[\s,:]*")
+
+
+def pick_named[R: ReviewerLike](reviewers: Iterable[R], note: str) -> tuple[list[R], str]:
+    """Reviewers named at the start of the note, and what's left of the note.
+
+    Names match healthy reviewers without regard to case, separated by spaces or
+    commas: "security, perf check refunds" picks security and perf, leaving "check refunds".
+    """
+    by_name = {r.name.lower(): r for r in reviewers if not r.errors}
+    picked: list[R] = []
+    rest = note.strip()
+    while match := _LEADING_WORD.match(rest):
+        reviewer = by_name.get(match.group(1).lower())
+        if reviewer is None:
+            break
+        if reviewer not in picked:
+            picked.append(reviewer)
+        rest = rest[match.end() :]
+    return picked, rest
+
+
+def by_names[R: ReviewerLike](reviewers: Iterable[R], names: Iterable[str]) -> tuple[list[R], list[str]]:
+    """Healthy reviewers with these names, and the names that matched none."""
+    by_name = {r.name.lower(): r for r in reviewers if not r.errors}
+    picked: list[R] = []
+    unknown: list[str] = []
+    for name in names:
+        reviewer = by_name.get(name.strip().lower())
+        if reviewer is None:
+            unknown.append(name)
+        elif reviewer not in picked:
+            picked.append(reviewer)
+    return picked, unknown
 
 
 def fallback[R: ReviewerLike](reviewers: Iterable[R], full_name: str) -> list[R]:
