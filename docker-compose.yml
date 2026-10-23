@@ -76,5 +76,18 @@ services:
       web:
         condition: service_healthy
 
+  # Local installs only: a Cloudflare quick tunnel, so GitHub Actions runners can reach web.
+  #   docker compose --profile tunnel up -d, then find the https://<random>.trycloudflare.com URL with
+  #   docker compose logs tunnel, set CHAKSHU_RUNNER_URL to it in .env and run docker compose up -d web worker.
+  # The URL changes every time the tunnel restarts.
+  tunnel:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:2026.9.3
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "--url", "http://web:8000"]
+    depends_on:
+      web:
+        condition: service_healthy
+
 volumes:
   pgdata:
