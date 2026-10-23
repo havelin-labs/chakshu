@@ -33,6 +33,21 @@ async def start(client: GitHub, full_name: str, head_sha: str, reviewer: str, ru
     return resp.parsed_data.id
 
 
+async def link_actions_run(client: GitHub, full_name: str, check_id: int, url: str) -> None:
+    """Point the check's Details link at the Actions run, where the logs are."""
+    owner, repo = full_name.split("/", 1)
+    await client.rest.checks.async_update(
+        owner,
+        repo,
+        check_id,
+        details_url=url,
+        output={
+            "title": "Reviewing in GitHub Actions",
+            "summary": f"The review is running in GitHub Actions. [Open the run for its logs]({url}).",
+        },
+    )
+
+
 async def finish(
     client: GitHub, full_name: str, check_id: int, *, conclusion: str, title: str, summary: str
 ) -> None:

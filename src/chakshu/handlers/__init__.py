@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chakshu.db.models import WebhookEvent
-from chakshu.handlers import installation, issue_comment, pull_request, push
+from chakshu.handlers import installation, issue_comment, pull_request, push, workflow_run
 from chakshu.handlers.context import Context, Payload
 from chakshu.services import github
 
@@ -20,6 +20,7 @@ HANDLERS: dict[str, Handler] = {
     "issue_comment": issue_comment.handle,
     "pull_request": pull_request.handle,
     "push": push.handle,
+    "workflow_run": workflow_run.handle,
 }
 
 

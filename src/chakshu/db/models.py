@@ -92,10 +92,15 @@ class Reviewer(Base, TimestampMixin):
 
 
 class JobStatus(StrEnum):
-    """Lifecycle shared by everything the worker processes (runs, webhook events)."""
+    """Lifecycle shared by everything the worker processes (runs, webhook events).
+
+    Runs have one extra step: the worker dispatches them to GitHub Actions and
+    they stay `dispatched` until the runner reports back (or the Actions run ends).
+    """
 
     QUEUED = "queued"
     RUNNING = "running"
+    DISPATCHED = "dispatched"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -140,6 +145,9 @@ class Run(Base, JobMixin, TimestampMixin):
     result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     review_url: Mapped[str | None] = mapped_column(String(500))
     check_run_id: Mapped[int | None] = mapped_column(BigInteger)
+    # The GitHub Actions run doing the review. Only that run may fetch the job and report back.
+    actions_run_id: Mapped[int | None] = mapped_column(BigInteger, index=True)
+    actions_run_url: Mapped[str | None] = mapped_column(String(500))
 
     __table_args__ = (Index("ix_runs_status_created_at", "status", "created_at"),)
 

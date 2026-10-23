@@ -14,7 +14,10 @@ dependencies = [
   "asyncpg>=0.30,<1",
   "alembic>=1.15,<2",
   "cryptography>=44",
-  "githubkit[auth-app]>=0.13,<1",
+  # 0.16 speaks REST API 2026-03-10, where a workflow dispatch returns the run it started.
+  "githubkit[auth-app]>=0.16,<1",
+  "httpx>=0.28,<1",
+  "pyjwt[crypto]>=2.10,<3",
   "itsdangerous>=2.2,<3",
   "pyyaml>=6.0,<7",
   "pathspec>=0.12,<1",

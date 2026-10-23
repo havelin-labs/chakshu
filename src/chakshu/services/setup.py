@@ -27,8 +27,9 @@ APP_PERMISSIONS = {
     "issues": "write",
     "members": "read",
     "metadata": "read",
+    "actions": "write",  # start the review workflow and hear when it ends
 }
-APP_EVENTS = ["pull_request", "issue_comment", "push"]
+APP_EVENTS = ["pull_request", "issue_comment", "push", "workflow_run"]
 
 
 def new_setup_code() -> str:

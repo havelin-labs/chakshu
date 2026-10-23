@@ -29,6 +29,7 @@ def serialize(run: Run, repo: Repo, reviewer: Reviewer, *, detail: bool = False)
         "cost_usd": float(run.cost_usd) if run.cost_usd is not None else None,
         "duration_ms": run.duration_ms,
         "review_url": run.review_url,
+        "actions_run_url": run.actions_run_url,
         "created_at": run.created_at.isoformat(),
         "finished_at": run.finished_at.isoformat() if run.finished_at else None,
     }

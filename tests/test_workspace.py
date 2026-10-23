@@ -45,12 +45,35 @@ def test_symlinks_out_of_the_checkout_are_removed(tmp_path):
     assert (code / "inside").exists()
 
 
-def test_skills_are_installed_by_short_name(tmp_path):
+def test_skills_are_bundled_by_short_name_and_written_back(tmp_path):
     shared = tmp_path / "src" / "shared" / "skills" / "secure-coding"
-    _touch(shared / "SKILL.md")
-    names = files.install_skills({files.skill_name("shared/secure-coding"): shared}, tmp_path / "ws")
-    assert names == ["secure-coding"]
-    assert (tmp_path / "ws" / ".claude" / "skills" / "secure-coding" / "SKILL.md").is_file()
+    _touch(shared / "SKILL.md", "# Secure coding")
+    _touch(shared / "refs" / "owasp.md", "A01")
+    (shared / "logo.png").write_bytes(b"\x89PNG\r\n\x1a\n\xff\xfe")
+
+    bundle = files.skill_files({files.skill_name("shared/secure-coding"): shared})
+    assert bundle == {
+        ".claude/skills/secure-coding/SKILL.md": "# Secure coding",
+        ".claude/skills/secure-coding/refs/owasp.md": "A01",
+    }
+
+    files.write_files(tmp_path / "ws", bundle | {"CLAUDE.md": "rules"})
+    assert (
+        tmp_path / "ws" / ".claude" / "skills" / "secure-coding" / "refs" / "owasp.md"
+    ).read_text() == "A01"
+    assert (tmp_path / "ws" / "CLAUDE.md").read_text() == "rules"
+
+
+def test_bundles_have_a_size_limit(tmp_path):
+    _touch(tmp_path / "big" / "SKILL.md", "x" * 100)
+    with pytest.raises(files.BundleTooLarge):
+        files.skill_files({"big": tmp_path / "big"}, max_bytes=50)
+
+
+@pytest.mark.parametrize("path", ["../escape.md", "code/CLAUDE.md", "/etc/passwd"])
+def test_server_files_cannot_land_outside_the_workspace_or_in_the_code(tmp_path, path):
+    with pytest.raises(ValueError, match="Refusing"):
+        files.write_files(tmp_path / "ws", {path: "x"})
 
 
 def test_prompt_fences_untrusted_text():

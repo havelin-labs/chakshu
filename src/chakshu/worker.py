@@ -1,7 +1,8 @@
-"""The worker process: handle webhook events and run reviews from the database queues.
+"""The worker process: handle webhook events and hand queued runs to GitHub Actions.
 
-On SIGTERM it stops claiming, lets running reviews finish for up to GRACE, then
-hands anything still unfinished back to the queue for another worker.
+Reviews themselves run on Actions runners, so everything here is short: a
+webhook handler or a workflow dispatch. On SIGTERM the worker finishes the job
+in hand, then hands anything it still holds back to the queue.
 """
 
 import asyncio
@@ -16,34 +17,28 @@ import uuid
 from pathlib import Path
 
 from chakshu import handlers
-from chakshu.core.config import get_settings
 from chakshu.db.models import Run, WebhookEvent
 from chakshu.db.session import get_sessionmaker
-from chakshu.services import events, queue, review_runner
+from chakshu.services import dispatcher, events, queue, review_results
 
 log = logging.getLogger("chakshu.worker")
 
 POLL_SECONDS = 2.0
 PRUNE_EVERY = 3600.0
-# Keep below the compose stop_grace_period so hand-back happens before SIGKILL.
-GRACE_SECONDS = 9 * 60
 # Touched by the maintenance loop. The container healthcheck fails if it goes stale.
 ALIVE_FILE = Path(tempfile.gettempdir()) / "chakshu-worker.alive"
 
 
 class Worker:
-    def __init__(self, concurrency: int):
+    def __init__(self):
         self.id = f"{socket.gethostname()}-{os.getpid()}-{uuid.uuid4().hex[:6]}"
-        self.slots = asyncio.Semaphore(concurrency)
         self.stopping = asyncio.Event()
-        self.reviews: set[asyncio.Task] = set()
 
     async def _pause(self, seconds: float) -> None:
         """Sleep, but wake up straight away when shutdown starts."""
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(self.stopping.wait(), seconds)
 
-    # Webhook events: quick, one at a time.
     async def _handle_next_event(self) -> bool:
         async with get_sessionmaker()() as session:
             event = await queue.claim(session, WebhookEvent, self.id)
@@ -63,47 +58,26 @@ class Worker:
             await queue.finish(session, event, error)
             return True
 
-    async def event_loop(self) -> None:
+    async def _dispatch_next_run(self) -> bool:
+        async with get_sessionmaker()() as session:
+            run = await queue.claim(session, Run, self.id)
+            if run is None:
+                return False
+            log.info("Dispatching run %s", run.id)
+            await dispatcher.dispatch(session, run.id)
+            return True
+
+    async def _loop(self, step) -> None:
         while not self.stopping.is_set():
             try:
-                busy = await self._handle_next_event()
+                busy = await step()
             except Exception:
-                log.exception("Event loop error; retrying")
+                log.exception("%s failed; retrying", step.__name__)
                 busy = False
             if not busy:
                 await self._pause(POLL_SECONDS)
 
-    # Reviews: slow, several at a time.
-    async def _review(self, run_id: uuid.UUID) -> None:
-        try:
-            await review_runner.process(run_id)
-        except Exception:
-            log.exception("Run %s crashed the runner", run_id)
-        finally:
-            self.slots.release()
-
-    async def run_loop(self) -> None:
-        while not self.stopping.is_set():
-            if self.slots.locked():
-                await self._pause(POLL_SECONDS)
-                continue
-            await self.slots.acquire()
-            try:
-                async with get_sessionmaker()() as session:
-                    run = await queue.claim(session, Run, self.id)
-            except Exception:
-                log.exception("Couldn't claim a run; retrying")
-                run = None
-            if run is None:
-                self.slots.release()
-                await self._pause(POLL_SECONDS)
-                continue
-            log.info("Claimed run %s", run.id)
-            task = asyncio.create_task(self._review(run.id))
-            self.reviews.add(task)
-            task.add_done_callback(self.reviews.discard)
-
-    # Heartbeats, recovery of jobs from dead workers, pruning. Keeps going during shutdown.
+    # Heartbeats, recovery of jobs from dead workers, expiry of silent runners, pruning.
     async def maintenance_loop(self) -> None:
         last_prune = 0.0
         while True:
@@ -113,6 +87,8 @@ class Worker:
                     await queue.heartbeat(session, self.id)
                     if requeued := await queue.requeue_stale(session):
                         log.warning("Requeued %s job(s) from a worker that stopped", requeued)
+                    if expired := await review_results.expire_dispatched(session):
+                        log.warning("Gave up on %s run(s) that GitHub Actions never finished", expired)
                     if time.monotonic() - last_prune > PRUNE_EVERY:
                         await events.prune(session)
                         last_prune = time.monotonic()
@@ -127,14 +103,7 @@ class Worker:
                 loop.add_signal_handler(sig, self.stopping.set)
 
         maintenance = asyncio.create_task(self.maintenance_loop())
-        await asyncio.gather(self.event_loop(), self.run_loop())
-
-        if self.reviews:
-            log.info("Stopping: waiting up to %ss for %s review(s)", GRACE_SECONDS, len(self.reviews))
-            _, unfinished = await asyncio.wait(self.reviews, timeout=GRACE_SECONDS)
-            for task in unfinished:
-                task.cancel()
-            await asyncio.gather(*unfinished, return_exceptions=True)
+        await asyncio.gather(self._loop(self._handle_next_event), self._loop(self._dispatch_next_run))
         maintenance.cancel()
         async with get_sessionmaker()() as session:
             if released := await queue.release(session, self.id):
@@ -143,9 +112,8 @@ class Worker:
 
 
 async def run_forever() -> None:
-    concurrency = max(1, get_settings().worker_concurrency)
-    worker = Worker(concurrency)
-    log.info("Worker %s started, up to %s review(s) at a time", worker.id, concurrency)
+    worker = Worker()
+    log.info("Worker %s started", worker.id)
     await worker.run()
 
 
