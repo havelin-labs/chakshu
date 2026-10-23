@@ -49,7 +49,7 @@ PEOPLE_COLUMNS = (
     "cost_triggered",
     "last_activity_at",
 )
-PAGE_SIZES = (24, 48, 96)
+PAGE_SIZES = (12, 24, 48)  # multiples of 2 and 3, so rows of cards come out even
 
 
 def filters(
@@ -151,7 +151,7 @@ async def people(
     session: SessionDep,
     user: AdminDep,
     page: int = Query(1, ge=1),
-    page_size: int = Query(24),
+    page_size: int = Query(12),
 ) -> dict:
     if page_size not in PAGE_SIZES:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"page_size must be one of {PAGE_SIZES}.")

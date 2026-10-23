@@ -20,7 +20,7 @@ describe("directory URL params", () => {
 
   it("ignores values it doesn't know", () => {
     const params = readParams(new URLSearchParams("days=12&sort=rank&page=-2&page_size=1000&view=cards"))
-    expect(params).toMatchObject({ days: 30, sort: "name", page: 1, page_size: 24, view: null })
+    expect(params).toMatchObject({ days: 30, sort: "name", page: 1, page_size: 12, view: null })
   })
 
   it("keeps the view out of API calls", () => {
