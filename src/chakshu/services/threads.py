@@ -7,6 +7,9 @@ threads people started are never touched.
   the latest review didn't raise the same finding again. Outcome: fixed.
 - A thread someone else resolved after the code changed: fixed.
 - A thread someone resolved while the code is unchanged: dismissed.
+
+Chakshu also resolves a thread when someone replies and its answer agrees the
+finding is fixed or wrong (services/replies.py); that outcome is recorded directly.
 """
 
 import logging
@@ -25,7 +28,7 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
     pullRequest(number: $number) {
       reviewThreads(first: 100, after: $after) {
         pageInfo { hasNextPage endCursor }
-        nodes { id isResolved isOutdated comments(first: 1) { nodes { body } } }
+        nodes { id isResolved isOutdated comments(first: 1) { nodes { body databaseId } } }
       }
     }
   }
@@ -43,6 +46,7 @@ class Thread:
     resolved: bool
     outdated: bool
     first_comment: str
+    first_comment_id: int | None = None
 
 
 @dataclass
@@ -82,6 +86,7 @@ async def _threads(client: GitHub, owner: str, name: str, number: int) -> list[T
                     node["isResolved"],
                     node["isOutdated"],
                     comments[0]["body"] if comments else "",
+                    comments[0].get("databaseId") if comments else None,
                 )
             )
         if not page["pageInfo"]["hasNextPage"]:
@@ -98,3 +103,13 @@ async def tidy(client: GitHub, full_name: str, number: int, still_found: set[str
     if scan.resolve:
         log.info("Resolved %s outdated Chakshu thread(s) on %s#%s", len(scan.resolve), full_name, number)
     return scan
+
+
+async def resolve_started_by(client: GitHub, full_name: str, number: int, comment_id: int) -> bool:
+    """Resolve the open thread whose first comment is `comment_id`. False if there's none."""
+    owner, name = full_name.split("/", 1)
+    for thread in await _threads(client, owner, name, number):
+        if thread.first_comment_id == comment_id and not thread.resolved:
+            await client.async_graphql(RESOLVE_MUTATION, {"id": thread.id})
+            return True
+    return False

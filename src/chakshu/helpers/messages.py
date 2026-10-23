@@ -48,3 +48,13 @@ def over_budget(login: str | None, spent: float, cap: float) -> str:
 
 def queued(names: Iterable[str]) -> str:
     return f"{MARKER}\nQueued: " + ", ".join(f"`{n}`" for n in names)
+
+
+REPLY_OUTCOME_NOTE = {"fixed": "marked fixed", "dismissed": "marked dismissed"}
+
+
+def reply(text: str, reviewer: str, outcome: str | None = None) -> str:
+    """Chakshu's answer in a review thread. A fixed or dismissed finding says so under the answer."""
+    note = REPLY_OUTCOME_NOTE.get(outcome or "")
+    source = f"{reviewer} · {note}" if note else reviewer
+    return f"{text.strip()}\n\n<sub>{source}</sub>\n{MARKER}"

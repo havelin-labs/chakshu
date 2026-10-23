@@ -3,6 +3,8 @@
 check run in progress -> PR still at this commit? -> workflow_dispatch -> link the
 check to the Actions run. The run then waits as `dispatched` until the runner
 reports back through the runner API.
+
+Reply runs skip the check run and answer at whatever commit the PR is at now.
 """
 
 import logging
@@ -59,7 +61,9 @@ async def _dispatch(ctx: RunContext) -> None:
         )
 
     pr = (await client.rest.pulls.async_get(owner, name, run.pr_number)).parsed_data
-    if pr.head.sha != run.head_sha:
+    if run.reply_to:
+        run.head_sha = pr.head.sha
+    elif pr.head.sha != run.head_sha:
         raise jobs.Superseded(pr.head.sha)
 
     try:
@@ -73,7 +77,7 @@ async def _dispatch(ctx: RunContext) -> None:
                     run_id=str(run.id),
                     pr=run.pr_number,
                     head_sha=run.head_sha,
-                    reviewer=ctx.reviewer.name,
+                    reviewer=f"{ctx.reviewer.name} (reply)" if run.reply_to else ctx.reviewer.name,
                     server=server,
                 ),
             },
@@ -104,7 +108,7 @@ async def dispatch(session: AsyncSession, run_id: uuid.UUID) -> None:
         return
 
     try:
-        if run.check_run_id is None:
+        if run.check_run_id is None and not run.reply_to:
             run.check_run_id = await checks.start(
                 ctx.client, ctx.repo.full_name, run.head_sha, ctx.reviewer.name, str(run.id)
             )

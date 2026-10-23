@@ -1,4 +1,4 @@
-"""Run one review with the Claude Agent SDK.
+"""Run one review, or one answer to a reply, with the Claude Agent SDK.
 
 The agent gets read-only tools and nothing else: no shell, no network, no
 GitHub token. It runs in the workspace folder, loads only the workspace's
@@ -16,12 +16,21 @@ from typing import Any
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
 from chakshu.connectors.bridge import Toolset
-from chakshu.helpers.prompt import FINDINGS_SCHEMA, SYSTEM_PROMPT
+from chakshu.helpers.prompt import (
+    FINDINGS_SCHEMA,
+    REPLY_OUTCOMES,
+    REPLY_SCHEMA,
+    REPLY_SYSTEM_PROMPT,
+    SYSTEM_PROMPT,
+)
 
 log = logging.getLogger(__name__)
 
 TOOLS = ["Read", "Grep", "Glob", "Skill"]
 MAX_TURNS = 40
+# Answering a reply is a short job: a few reads, then a paragraph.
+REPLY_MAX_TURNS = 15
+REPLY_MAX_USD = 0.5
 
 
 class EngineError(RuntimeError):
@@ -37,6 +46,7 @@ class ReviewResult:
     cost_usd: float | None = None
     duration_ms: int | None = None
     turns: int | None = None
+    outcome: str | None = None  # replies: open, fixed or dismissed
 
 
 def _env(auth_env: dict[str, str], config_dir: Path) -> dict[str, str]:
@@ -56,12 +66,15 @@ def options(
     max_usd: float,
     auth_env: dict[str, str],
     toolsets: Sequence[Toolset] = (),
+    system_prompt: str = SYSTEM_PROMPT,
+    schema: dict[str, Any] = FINDINGS_SCHEMA,
+    max_turns: int = MAX_TURNS,
 ) -> ClaudeAgentOptions:
     config_dir = workspace.parent / "claude-config"
     config_dir.mkdir(exist_ok=True)
     return ClaudeAgentOptions(
         cwd=str(workspace),
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=system_prompt,
         tools=TOOLS,
         # Connector tools are read-only lookups that run in this process, not in the agent's sandbox.
         allowed_tools=TOOLS + [name for t in toolsets for name in t.tool_names],
@@ -71,26 +84,16 @@ def options(
         strict_mcp_config=True,
         mcp_servers={t.server_name: t.server for t in toolsets},
         model=model,
-        max_turns=MAX_TURNS,
+        max_turns=max_turns,
         max_budget_usd=max_usd,
-        output_format={"type": "json_schema", "schema": FINDINGS_SCHEMA},
+        output_format={"type": "json_schema", "schema": schema},
         env=_env(auth_env, config_dir),
     )
 
 
-async def review(
-    workspace: Path,
-    prompt: str,
-    *,
-    model: str,
-    max_usd: float,
-    auth_env: dict[str, str],
-    toolsets: Sequence[Toolset] = (),
-    observe: Callable[[Any], None] | None = None,
-) -> ReviewResult:
-    """`observe` sees every message as it arrives, e.g. to print progress to the Actions log."""
+async def _run(prompt: str, opts: ClaudeAgentOptions, observe: Callable[[Any], None] | None) -> ResultMessage:
+    """The agent's final message, once it returned structured output."""
     result: ResultMessage | None = None
-    opts = options(workspace, model=model, max_usd=max_usd, auth_env=auth_env, toolsets=toolsets)
     try:
         async for message in query(prompt=prompt, options=opts):
             if observe:
@@ -105,7 +108,22 @@ async def review(
     if result is None or result.subtype != "success" or not result.structured_output:
         subtype = result.subtype if result else "no result"
         raise EngineError(f"Review didn't finish ({subtype}).", result.total_cost_usd if result else None)
+    return result
 
+
+async def review(
+    workspace: Path,
+    prompt: str,
+    *,
+    model: str,
+    max_usd: float,
+    auth_env: dict[str, str],
+    toolsets: Sequence[Toolset] = (),
+    observe: Callable[[Any], None] | None = None,
+) -> ReviewResult:
+    """`observe` sees every message as it arrives, e.g. to print progress to the Actions log."""
+    opts = options(workspace, model=model, max_usd=max_usd, auth_env=auth_env, toolsets=toolsets)
+    result = await _run(prompt, opts, observe)
     output = result.structured_output
     return ReviewResult(
         summary=output.get("summary", ""),
@@ -113,4 +131,35 @@ async def review(
         cost_usd=result.total_cost_usd,
         duration_ms=result.duration_ms,
         turns=result.num_turns,
+    )
+
+
+async def reply(
+    workspace: Path,
+    prompt: str,
+    *,
+    model: str,
+    max_usd: float,
+    auth_env: dict[str, str],
+    observe: Callable[[Any], None] | None = None,
+) -> ReviewResult:
+    """Answer a reply to a review comment: the answer is `summary`, plus the finding's `outcome`."""
+    opts = options(
+        workspace,
+        model=model,
+        max_usd=min(max_usd, REPLY_MAX_USD),
+        auth_env=auth_env,
+        system_prompt=REPLY_SYSTEM_PROMPT,
+        schema=REPLY_SCHEMA,
+        max_turns=REPLY_MAX_TURNS,
+    )
+    result = await _run(prompt, opts, observe)
+    output = result.structured_output
+    outcome = output.get("outcome")
+    return ReviewResult(
+        summary=str(output.get("reply", "")).strip(),
+        cost_usd=result.total_cost_usd,
+        duration_ms=result.duration_ms,
+        turns=result.num_turns,
+        outcome=outcome if outcome in REPLY_OUTCOMES else "open",
     )

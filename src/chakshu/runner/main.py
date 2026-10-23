@@ -1,4 +1,4 @@
-"""`chakshu action`: do one review inside GitHub Actions.
+"""`chakshu action`: do one review, or answer one reply to a review comment, inside GitHub Actions.
 
 fetch the job -> prepare the workspace -> run the agent (logging as it goes)
 -> send the result, or the reason it failed, back to Chakshu.
@@ -75,10 +75,11 @@ def observe(message: Any) -> None:
             log.info("%s", _brief(block.text.strip(), 400))
 
 
-def write_step_summary(job: Job, result: Result, review_url: str | None) -> None:
-    path = os.environ.get("GITHUB_STEP_SUMMARY")
-    if not path:
-        return
+def _summary_lines(job: Job, result: Result, review_url: str | None) -> list[str]:
+    if job.kind == "reply":
+        lines = [f"## Chakshu · {job.reviewer} · reply", "", result.summary]
+        lines += ["", f"Finding: {result.outcome or 'open'}"]
+        return lines + (["", f"[Open the thread]({review_url})"] if review_url else [])
     lines = [
         f"## Chakshu · {job.reviewer}",
         "",
@@ -96,8 +97,15 @@ def write_step_summary(job: Job, result: Result, review_url: str | None) -> None
         ]
     if review_url:
         lines += ["", f"[Open the review]({review_url})"]
+    return lines
+
+
+def write_step_summary(job: Job, result: Result, review_url: str | None) -> None:
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path:
+        return
     with open(path, "a", encoding="utf-8") as summary:
-        summary.write("\n".join(lines) + "\n")
+        summary.write("\n".join(_summary_lines(job, result, review_url)) + "\n")
 
 
 async def _report_failure(client: ServerClient, failure: Failure) -> None:
@@ -118,7 +126,8 @@ async def run(server: str, run_id: uuid.UUID, workspace: Path) -> int:
             log.error("Chakshu didn't hand out the job: %s", exc)
             return 1
         log.info(
-            "Reviewing %s#%s at %s with the %s reviewer (%s)",
+            "%s %s#%s at %s with the %s reviewer (%s)",
+            "Answering a reply on" if job.kind == "reply" else "Reviewing",
             job.repo,
             job.pr_number,
             job.head_sha[:7],
@@ -128,16 +137,26 @@ async def run(server: str, run_id: uuid.UUID, workspace: Path) -> int:
         try:
             auth_env = claude_access()
             prepare(workspace, job)
-            toolsets = [bridge.toolset(c, client.call_tool) for c in job.connectors]
-            reviewed = await engine.review(
-                workspace,
-                job.prompt,
-                model=job.model,
-                max_usd=job.max_usd,
-                auth_env=auth_env,
-                toolsets=toolsets,
-                observe=observe,
-            )
+            if job.kind == "reply":
+                reviewed = await engine.reply(
+                    workspace,
+                    job.prompt,
+                    model=job.model,
+                    max_usd=job.max_usd,
+                    auth_env=auth_env,
+                    observe=observe,
+                )
+            else:
+                toolsets = [bridge.toolset(c, client.call_tool) for c in job.connectors]
+                reviewed = await engine.review(
+                    workspace,
+                    job.prompt,
+                    model=job.model,
+                    max_usd=job.max_usd,
+                    auth_env=auth_env,
+                    toolsets=toolsets,
+                    observe=observe,
+                )
         except Exception as exc:  # noqa: BLE001 - reported to Chakshu, then the job fails
             log.error("Review failed: %s", exc)
             cost = exc.cost_usd if isinstance(exc, engine.EngineError) else None
@@ -150,8 +169,12 @@ async def run(server: str, run_id: uuid.UUID, workspace: Path) -> int:
             cost_usd=reviewed.cost_usd,
             duration_ms=reviewed.duration_ms,
             turns=reviewed.turns,
+            outcome=reviewed.outcome,
         )
-        log.info("Done: %s finding(s). Sending them to Chakshu to post.", len(result.findings))
+        if job.kind == "reply":
+            log.info("Done (finding %s). Sending the answer to Chakshu to post.", result.outcome)
+        else:
+            log.info("Done: %s finding(s). Sending them to Chakshu to post.", len(result.findings))
         try:
             review_url = await client.result(result)
         except ServerError as exc:
