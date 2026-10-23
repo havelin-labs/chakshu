@@ -223,12 +223,17 @@ async def test_settings_changes_are_audited(db, client, as_user):
     response = await admin.patch(
         "/api/settings/analytics", json={"show_names": False}, headers=await _csrf(admin)
     )
-    assert response.json() == {"show_names": False, "min_group": 5}
+    assert response.json() == {
+        "show_names": False,
+        "min_group": 5,
+        "retention_days": None,
+        "export_people": True,
+    }
     row = (await db.scalars(select(AnalyticsAudit))).one()
     assert row.action == "settings.analytics.update"
     assert row.filters == {
-        "old": {"show_names": True, "min_group": 5},
-        "new": {"show_names": False, "min_group": 5},
+        "old": {"show_names": True, "min_group": 5, "retention_days": None, "export_people": True},
+        "new": {"show_names": False, "min_group": 5, "retention_days": None, "export_people": True},
     }
     member = as_user("bob", admin=False)
     assert (

@@ -182,6 +182,10 @@ def _audit(f: Filters, query: analytics.DirectoryQuery | None = None) -> dict:
 async def people_csv(
     f: FiltersDep, query: DirectoryQueryDep, session: SessionDep, user: AdminDep
 ) -> PlainTextResponse:
+    if not (await analytics.privacy(session)).export_people:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Exporting named people is turned off in the privacy settings."
+        )
     result = await _directory(session, f, query)
     if result["hidden"] or not result["rows"]:
         raise HTTPException(status.HTTP_409_CONFLICT, "There's nothing to export for this selection.")

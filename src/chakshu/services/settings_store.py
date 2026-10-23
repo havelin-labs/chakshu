@@ -36,6 +36,8 @@ class Key(StrEnum):
     ANALYTICS_MIN_GROUP = (
         "analytics.min_group"  # hide grouped numbers covering fewer people than this; 1 is off
     )
+    ANALYTICS_RETENTION_DAYS = "analytics.retention_days"  # clear who asked and who authored on older runs
+    ANALYTICS_EXPORT_PEOPLE = "analytics.export_people"  # "false" refuses CSV export of named people
     MEMBERS_SYNCED_AT = "members.synced_at"  # when the org member list last came from GitHub (ISO 8601)
     ALERTS_WEBHOOK = "alerts.webhook"  # Slack incoming webhook for spend alerts and the digest
     ALERTS_THRESHOLDS = "alerts.thresholds"  # percentages of the monthly cap, e.g. "50,80,100"
@@ -65,6 +67,7 @@ DEFAULTS: dict[Key, str] = {
     Key.ANALYTICS_MIN_GROUP: "5",
     Key.ALERTS_THRESHOLDS: "50,80,100",
     Key.ALERTS_DIGEST: "true",
+    Key.ANALYTICS_EXPORT_PEOPLE: "true",
 }
 
 
