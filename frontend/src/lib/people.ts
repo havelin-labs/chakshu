@@ -180,3 +180,17 @@ export function pageList(current: number, total: number): (number | "gap")[] {
   }
   return pages
 }
+
+// "up 4 from the previous 30 days", in words only: more or less usage isn't good or bad by itself.
+export function deltaText(current: number, previous: number, days: number, format: (n: number) => string): string {
+  const span = days === 365 ? "previous year" : `previous ${days} days`
+  if (current === previous) return `same as the ${span}`
+  const difference = Math.abs(current - previous)
+  return `${current > previous ? "up" : "down"} ${format(difference)} from the ${span}`
+}
+
+export const ROLE_IN_RUN: Record<"requested" | "author" | "both", string> = {
+  requested: "Requested",
+  author: "Their PR",
+  both: "Requested on their PR",
+}

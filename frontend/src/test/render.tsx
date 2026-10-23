@@ -4,9 +4,9 @@ import axe from "axe-core"
 import type { ReactNode } from "react"
 import { createMemoryRouter, RouterProvider, type RouteObject } from "react-router-dom"
 
-export function renderRoutes(routes: RouteObject[], url: string) {
+export function renderRoutes(routes: RouteObject[], url: string, state?: unknown) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  const router = createMemoryRouter(routes, { initialEntries: [url] })
+  const router = createMemoryRouter(routes, { initialEntries: [{ pathname: new URL(url, "http://x").pathname, search: new URL(url, "http://x").search, state }] })
   const view = render(
     <QueryClientProvider client={client}>
       <RouterProvider router={router} />

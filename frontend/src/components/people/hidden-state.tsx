@@ -8,11 +8,13 @@ export function HiddenState({
   minGroup,
   isAdmin,
   onWiden,
+  settingsHref = "#privacy",
 }: {
   reason: HiddenReason
   minGroup: number
   isAdmin: boolean
   onWiden?: () => void
+  settingsHref?: string
 }) {
   if (reason === "names_off") {
     return (
@@ -20,7 +22,7 @@ export function HiddenState({
         title="Names are turned off for analytics. Individual usage isn't shown."
         action={
           isAdmin && (
-            <a className={buttonVariants({ variant: "outline", size: "sm" })} href="#privacy">
+            <a className={buttonVariants({ variant: "outline", size: "sm" })} href={settingsHref}>
               Open analytics settings
             </a>
           )
@@ -35,7 +37,7 @@ export function HiddenState({
         isAdmin && (
           <>
             The smallest group shown is set under{" "}
-            <a className="text-brand-teal-ink hover:underline" href="#privacy">
+            <a className="text-brand-teal-ink hover:underline" href={settingsHref}>
               Privacy
             </a>
             .

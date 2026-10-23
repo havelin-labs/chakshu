@@ -338,3 +338,65 @@ export type FindingRow = {
 }
 
 export type AnalyticsPrivacy = { show_names: boolean; min_group: number }
+export type PersonTotals = {
+  requested: number
+  prs_reviewed: number
+  auto_reviews: number
+  replies: number
+  self_requested_on_own_prs: number
+  cost_triggered: number
+  cost_on_own_prs: number
+}
+
+export type PersonProfile = {
+  login: string
+  name: string | null
+  avatar_url: string | null
+  org_role: "owner" | "member" | null
+  in_org: boolean
+  is_portal_admin: boolean
+  last_login_at: string | null
+  first_activity_at: string | null
+  last_activity_at: string | null
+  activity_state: ActivityState
+  github_url: string
+}
+
+// One person's page. When hidden, only `person` (small groups) or nothing (names off) comes back.
+export type PersonResult = {
+  hidden: boolean
+  hidden_reason: HiddenReason | null
+  min_group: number
+  is_self: boolean
+  canonical_login?: string
+  period: Period
+  person?: PersonProfile
+  totals?: PersonTotals
+  previous_totals?: PersonTotals
+  by_trigger?: { trigger: string; runs: number; cost_usd: number }[]
+  by_repo?: { repo_id: string | null; repo: string; runs: number; prs: number; cost_usd: number }[]
+  by_reviewer?: { reviewer: string; runs: number; cost_usd: number }[]
+  daily?: { day: string; requested: number; own_prs_reviewed: number }[]
+}
+
+export type PersonActivityItem = {
+  run_id: string
+  created_at: string
+  role: "requested" | "author" | "both"
+  trigger: string
+  repo: string
+  repo_id: string
+  pr_number: number
+  pr_title: string | null
+  reviewer: string
+  status: RunStatus
+  review_url: string | null
+  cost_usd: number | null
+}
+
+export type PersonActivityPage = {
+  hidden: boolean
+  hidden_reason: HiddenReason | null
+  items: PersonActivityItem[]
+  next_cursor: string | null
+}
