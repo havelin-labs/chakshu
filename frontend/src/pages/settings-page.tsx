@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState, type FormEvent } from "react"
 
+import { ActionsCard } from "@/components/actions-card"
 import { ConnectorsCard } from "@/components/connectors-card"
 import { WebhooksCard } from "@/components/webhooks-card"
 import { ErrorNotice, Notice } from "@/components/notice"
@@ -193,6 +194,7 @@ export function SettingsPage() {
         </CardContent>
       </Card>
       {settings.data && <WebhooksCard webhooks={settings.data.webhooks} />}
+      {settings.data && <ActionsCard runnerUrl={settings.data.runner_url} />}
       <ConnectorsCard />
     </section>
   )

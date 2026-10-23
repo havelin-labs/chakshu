@@ -4,11 +4,13 @@ import { useParams } from "react-router-dom"
 
 import { ErrorNotice, Notice } from "@/components/notice"
 import { PageHeader } from "@/components/page-header"
+import { RepoActionsCard } from "@/components/repo-actions-card"
 import { isActive, RunsTable } from "@/components/runs-table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { useSession } from "@/hooks/use-session"
 import { apiGet, apiPost, type Pull, type Repo, type ReviewOutcome, type Run } from "@/lib/api"
 import { timeAgo } from "@/lib/format"
 
@@ -68,6 +70,7 @@ export function RepoPage() {
     refetchInterval: (query) => (isActive(query.state.data) ? 5_000 : false),
   })
   const repo = repos.data?.find((r) => r.id === id)
+  const { data: session } = useSession()
 
   return (
     <section className="space-y-6">
@@ -77,6 +80,7 @@ export function RepoPage() {
       </PageHeader>
       {repo && !repo.enabled && <Notice>Reviews are turned off for this repository.</Notice>}
       <ErrorNotice error={pulls.error} />
+      <RepoActionsCard repoId={id} isAdmin={Boolean(session?.user?.is_admin)} />
       <Card>
         <CardContent className="divide-y">
           <h2 className="pb-2 text-xl font-bold">Open pull requests</h2>

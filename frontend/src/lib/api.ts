@@ -150,6 +150,8 @@ export type AdminSettings = {
   monthly_cap_usd: number | null
   spend_this_month: number
   reviewers_repo: string
+  actions_action: string
+  runner_url: string
   webhooks: { url: string; public: boolean; secret_set: boolean; events: string[] }
 }
 
@@ -182,3 +184,20 @@ export type Session = {
   user: User | null
   csrf_token: string
 }
+
+export type ActionsStatus = {
+  workflow: "current" | "outdated" | "missing"
+  proposal_url: string | null
+  secrets: Record<string, boolean>
+  ready: boolean
+}
+
+export type AppPermissions = {
+  ok: boolean
+  settings_url: string
+  missing: string[]
+  missing_events: string[]
+  installations: { account: string; missing: string[]; missing_events: string[]; review_url: string }[]
+}
+
+export type SecretsSync = { synced: string[]; failed: Record<string, string> }
