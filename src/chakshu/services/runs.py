@@ -2,7 +2,7 @@
 
 The work key identifies the work itself (PR, head commit, reviewer commit,
 reviewer). A second request for the same work is dropped while the first is
-queued, running or done; a new push or a reviewer edit makes a new key.
+queued, running (here or in Actions) or done; a new push or a reviewer edit makes a new key.
 """
 
 import uuid
@@ -15,7 +15,7 @@ from chakshu.core import ids
 from chakshu.db.models import Repo, Reviewer, Run, RunStatus
 from chakshu.services.github import AppCredentials
 
-LIVE_OR_DONE = (RunStatus.QUEUED, RunStatus.RUNNING, RunStatus.SUCCEEDED)
+LIVE_OR_DONE = (RunStatus.QUEUED, RunStatus.RUNNING, RunStatus.DISPATCHED, RunStatus.SUCCEEDED)
 
 
 def pr_key(ns: uuid.UUID, repo: Repo, pr_number: int) -> uuid.UUID:

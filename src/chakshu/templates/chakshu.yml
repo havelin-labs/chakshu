@@ -1,0 +1,52 @@
+# Added by Chakshu (https://chakshu.havelin.in). It runs the code reviews people ask
+# Chakshu for, so you can watch them here in the Actions tab. Chakshu starts it with
+# workflow_dispatch; it never runs on pushes or pull requests by itself.
+name: Chakshu
+run-name: "Chakshu: ${{ inputs.reviewer }} on #${{ inputs.pr }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Chakshu run ID
+        required: true
+      pr:
+        description: Pull request number
+        required: true
+      head_sha:
+        description: Commit to review
+        required: true
+      reviewer:
+        description: Reviewer
+        required: true
+      server:
+        description: Chakshu URL the runner reports back to
+        required: true
+
+permissions:
+  contents: read # check out the pull request
+  id-token: write # prove to Chakshu which run this is
+
+concurrency:
+  group: chakshu-${{ inputs.run_id }}
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head_sha }}
+          path: chakshu-workspace/code
+          persist-credentials: false
+
+      - uses: __CHAKSHU_ACTION__
+        with:
+          run-id: ${{ inputs.run_id }}
+          server: ${{ inputs.server }}
+          workspace: chakshu-workspace
+        env:
+          # Chakshu keeps these in step with its settings. One of them is enough.
+          ANTHROPIC_API_KEY: ${{ secrets.CHAKSHU_ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CHAKSHU_CLAUDE_CODE_OAUTH_TOKEN }}

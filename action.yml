@@ -1,0 +1,33 @@
+name: Chakshu review
+description: Run a code review that a Chakshu server asked for, and send the findings back to it.
+author: Havelin Labs
+
+inputs:
+  run-id:
+    description: Chakshu run ID, from the workflow_dispatch inputs
+    required: true
+  server:
+    description: Chakshu URL to fetch the job from and report to
+    required: true
+  workspace:
+    description: Folder holding the pull request checkout in code/
+    default: chakshu-workspace
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install Chakshu
+      shell: bash
+      run: python -m pip install --quiet --disable-pip-version-check "$GITHUB_ACTION_PATH"
+
+    - name: Review
+      shell: bash
+      run: chakshu action --run-id "$RUN_ID" --server "$SERVER" --workspace "$WORKSPACE"
+      env:
+        RUN_ID: ${{ inputs.run-id }}
+        SERVER: ${{ inputs.server }}
+        WORKSPACE: ${{ inputs.workspace }}

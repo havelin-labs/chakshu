@@ -49,7 +49,7 @@ def test_manifest_includes_webhooks_for_public_urls(monkeypatch):
     finally:
         get_settings.cache_clear()
     assert manifest["hook_attributes"]["url"] == "https://chakshu.example.com/webhooks/github"
-    assert set(manifest["default_events"]) == {"pull_request", "issue_comment", "push"}
+    assert set(manifest["default_events"]) == {"pull_request", "issue_comment", "push", "workflow_run"}
 
 
 def test_org_apps_are_created_under_the_org():

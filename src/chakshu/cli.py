@@ -1,11 +1,13 @@
-"""Command line entry point: `chakshu web`, `chakshu worker`, `chakshu migrate`."""
+"""Command line entry point: `chakshu web`, `chakshu worker`, `chakshu migrate`, `chakshu action`."""
 
 import argparse
 import asyncio
 import contextlib
 import logging
 import sys
+import uuid
 from importlib import resources
+from pathlib import Path
 
 import uvicorn
 
@@ -45,6 +47,13 @@ def _worker(_: argparse.Namespace) -> None:
         asyncio.run(worker.run_forever())
 
 
+def _action(args: argparse.Namespace) -> None:
+    from chakshu.runner import main as runner
+
+    configure_logging("INFO")
+    sys.exit(asyncio.run(runner.run(args.server, uuid.UUID(args.run_id), Path(args.workspace))))
+
+
 def _worker_health(_: argparse.Namespace) -> None:
     from chakshu import worker
 
@@ -65,6 +74,12 @@ def main(argv: list[str] | None = None) -> None:
         func=_worker_health
     )
     commands.add_parser("migrate", help="apply database migrations").set_defaults(func=_migrate)
+
+    action = commands.add_parser("action", help="do one review inside GitHub Actions")
+    action.add_argument("--run-id", required=True)
+    action.add_argument("--server", required=True, help="Chakshu URL to fetch the job from")
+    action.add_argument("--workspace", default="chakshu-workspace", help="folder with the PR in code/")
+    action.set_defaults(func=_action)
 
     args = parser.parse_args(argv)
     args.func(args)

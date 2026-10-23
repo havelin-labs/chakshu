@@ -8,7 +8,7 @@ throwaway directory so nothing leaks between runs.
 
 import logging
 import os
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -86,11 +86,15 @@ async def review(
     max_usd: float,
     auth_env: dict[str, str],
     toolsets: Sequence[Toolset] = (),
+    observe: Callable[[Any], None] | None = None,
 ) -> ReviewResult:
+    """`observe` sees every message as it arrives, e.g. to print progress to the Actions log."""
     result: ResultMessage | None = None
     opts = options(workspace, model=model, max_usd=max_usd, auth_env=auth_env, toolsets=toolsets)
     try:
         async for message in query(prompt=prompt, options=opts):
+            if observe:
+                observe(message)
             if isinstance(message, ResultMessage):
                 result = message
     except Exception as exc:
