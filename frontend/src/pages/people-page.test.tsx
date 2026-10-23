@@ -58,6 +58,10 @@ describe("PeoplePage", () => {
     expect(router.state.location.search).toBe("?days=90&view=table")
     await userEvent.type(screen.getByRole("searchbox"), "mona")
     await waitFor(() => expect(router.state.location.search).toBe("?days=90&q=mona&view=table"))
+    // Wait for the page to re-render with the search before sorting, as a person would.
+    await waitFor(() =>
+      expect(vi.mocked(fetch).mock.calls.map(([url]) => String(url))).toContain("/api/analytics/people?days=90&q=mona"),
+    )
     expect(screen.getByRole("columnheader", { name: /Name/ })).toHaveAttribute("aria-sort", "ascending")
     await userEvent.click(screen.getByRole("button", { name: /Cost of requests/ }))
     expect(router.state.location.search).toBe("?days=90&q=mona&sort=cost&view=table")
