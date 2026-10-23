@@ -194,7 +194,7 @@ export function SettingsPage() {
         </CardContent>
       </Card>
       {settings.data && <WebhooksCard webhooks={settings.data.webhooks} />}
-      {settings.data && <ActionsCard runnerUrl={settings.data.runner_url} />}
+      {settings.data && <ActionsCard runnerUrl={settings.data.runner_url} runnerPublic={settings.data.runner_public} />}
       <ConnectorsCard />
     </section>
   )

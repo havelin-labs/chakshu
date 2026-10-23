@@ -37,7 +37,7 @@ function PermissionGaps({ report }: { report: AppPermissions }) {
 }
 
 // Settings: what GitHub Actions needs from the app, and pushing the Claude credential to every repo.
-export function ActionsCard({ runnerUrl }: { runnerUrl: string }) {
+export function ActionsCard({ runnerUrl, runnerPublic }: { runnerUrl: string; runnerPublic: boolean }) {
   const permissions = useQuery({
     queryKey: ["permissions"],
     queryFn: () => apiGet<AppPermissions>("/api/settings/permissions"),
@@ -54,6 +54,14 @@ export function ActionsCard({ runnerUrl }: { runnerUrl: string }) {
           <code className="font-mono">{runnerUrl}</code>, so GitHub has to be able to reach it. Chakshu copies the Claude
           credential into each repository's secrets when you save it here.
         </p>
+        {!runnerPublic && (
+          <Notice tone="error">
+            Runners can't reach {runnerUrl} from GitHub, so reviews will start but never finish. On a laptop, start the
+            tunnel with <code className="font-mono">docker compose --profile tunnel up -d</code>, set{" "}
+            <code className="font-mono">CHAKSHU_RUNNER_URL</code> in .env to the trycloudflare.com address from{" "}
+            <code className="font-mono">docker compose logs tunnel</code>, and restart web and worker.
+          </Notice>
+        )}
         <ErrorNotice error={permissions.error ?? sync.error} />
         {permissions.data && <PermissionGaps report={permissions.data} />}
         <Button variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}>
