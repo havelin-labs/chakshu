@@ -74,6 +74,43 @@ export type Reviewer = {
   errors: string[]
 }
 
+export const SEVERITIES = ["info", "low", "medium", "high", "critical"] as const
+export type Severity = (typeof SEVERITIES)[number]
+
+export type SkillDraft = { name: string; description: string; body: string; extra: Record<string, unknown> }
+
+export type ReviewerLimits = { max_usd?: number | null; max_findings?: number; min_severity?: Severity }
+
+// A reviewer folder in editable form; saving it opens a pull request in the reviewers repo.
+export type ReviewerDraft = {
+  account: string
+  name: string
+  product: string | null
+  description: string | null
+  owner_team: string
+  model: string | null
+  repos: string[]
+  paths: string[]
+  auto: string[]
+  connectors: string[]
+  limits: ReviewerLimits
+  fail_check_on: Severity | null
+  tools: string[]
+  rules: string
+  skills: SkillDraft[]
+  shared_skills: string[]
+}
+
+export type ReviewerOptions = {
+  accounts: string[]
+  models: string[]
+  default_model: string | null
+  connectors: string[]
+  auto_events: string[]
+}
+
+export type ReviewerProposal = { url: string; number: number; created: boolean }
+
 export type RunStatus = "queued" | "running" | "dispatched" | "succeeded" | "failed" | "cancelled"
 
 // Still on its way to a result: queued here, being dispatched, or running in GitHub Actions.

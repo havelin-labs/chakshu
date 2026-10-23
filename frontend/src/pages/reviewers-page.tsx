@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Link } from "react-router-dom"
 
 import { ErrorNotice, Notice } from "@/components/notice"
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useSession } from "@/hooks/use-session"
 import { apiGet, apiPost, type Reviewer } from "@/lib/api"
@@ -54,11 +55,16 @@ function ReviewerCard({ reviewer }: { reviewer: Reviewer }) {
             </ul>
           </Notice>
         )}
-        {reviewer.source_url && (
-          <a className="text-sm text-brand-teal-ink hover:underline" href={reviewer.source_url} target="_blank" rel="noreferrer">
-            View on GitHub at {reviewer.source_sha.slice(0, 7)}
-          </a>
-        )}
+        <div className="flex flex-wrap items-center gap-4 text-sm">
+          <Link to={`/reviewers/${reviewer.id}/edit`} className="font-medium text-brand-teal-ink hover:underline">
+            Edit
+          </Link>
+          {reviewer.source_url && (
+            <a className="text-brand-teal-ink hover:underline" href={reviewer.source_url} target="_blank" rel="noreferrer">
+              View on GitHub at {reviewer.source_sha.slice(0, 7)}
+            </a>
+          )}
+        </div>
       </CardContent>
     </Card>
   )
@@ -78,17 +84,22 @@ export function ReviewersPage() {
     <section>
       <PageHeader
         eyebrow="Reviewers"
-        title="Your teams' reviewers"
+        title="Your organization's reviewers"
         actions={
-          session?.user?.is_admin && (
-            <Button variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}>
-              {sync.isPending ? "Syncing…" : "Sync from GitHub"}
-            </Button>
-          )
+          <div className="flex gap-2">
+            <Link to="/reviewers/new" className={buttonVariants()}>
+              New reviewer
+            </Link>
+            {session?.user?.is_admin && (
+              <Button variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}>
+                {sync.isPending ? "Syncing…" : "Sync from GitHub"}
+              </Button>
+            )}
+          </div>
         }
       >
-        Each one is a folder in your organization's reviewers repo. Edit them there with a pull request; Chakshu picks
-        up changes when they merge.
+        Each one is a folder in your organization's reviewers repo. Edit them here or in GitHub; either way the change
+        is a pull request, and Chakshu picks it up when it merges.
       </PageHeader>
       <div className="space-y-4">
         <ErrorNotice error={reviewers.error ?? sync.error} />
@@ -99,7 +110,7 @@ export function ReviewersPage() {
           </Notice>
         ))}
         {reviewers.data?.length === 0 && (
-          <Notice>No reviewers yet. Add a folder under reviewers/ in your reviewers repo, then sync.</Notice>
+          <Notice>No reviewers yet. Create one here, or add a folder under reviewers/ in your reviewers repo and sync.</Notice>
         )}
         <div className="grid gap-4 md:grid-cols-2">
           {reviewers.data?.map((reviewer) => <ReviewerCard key={reviewer.id} reviewer={reviewer} />)}

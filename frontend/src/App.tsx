@@ -7,6 +7,7 @@ import { InsightsPage } from "@/pages/insights-page"
 import { LoginPage } from "@/pages/login-page"
 import { RepoPage } from "@/pages/repo-page"
 import { ReposPage } from "@/pages/repos-page"
+import { ReviewerEditPage } from "@/pages/reviewer-edit-page"
 import { ReviewersPage } from "@/pages/reviewers-page"
 import { RunPage } from "@/pages/run-page"
 import { RunsPage } from "@/pages/runs-page"
@@ -26,6 +27,8 @@ const router = createBrowserRouter([
       { path: "/repos", element: signedIn(<ReposPage />) },
       { path: "/repos/:id", element: signedIn(<RepoPage />) },
       { path: "/reviewers", element: signedIn(<ReviewersPage />) },
+      { path: "/reviewers/new", element: signedIn(<ReviewerEditPage />) },
+      { path: "/reviewers/:id/edit", element: signedIn(<ReviewerEditPage />) },
       { path: "/insights", element: signedIn(<InsightsPage />) },
       { path: "/settings", element: signedIn(<SettingsPage />, true) },
       { path: "/status", element: signedIn(<StatusPage />) },
