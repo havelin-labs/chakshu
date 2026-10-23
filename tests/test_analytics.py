@@ -30,8 +30,10 @@ def test_change_against_the_previous_period():
     assert calc.change(None, 3) is None
 
 
-@pytest.mark.parametrize(("people", "k", "shown"), [(0, 5, True), (4, 5, False), (5, 5, True), (2, 1, False)])
-def test_small_groups_are_hidden_and_the_floor_is_three(people, k, shown):
+@pytest.mark.parametrize(
+    ("people", "k", "shown"), [(0, 5, True), (4, 5, False), (5, 5, True), (2, 2, False), (2, 1, True)]
+)
+def test_small_groups_are_hidden_the_floor_is_three_and_one_is_off(people, k, shown):
     assert calc.visible(people, k) is shown
 
 
@@ -134,24 +136,24 @@ async def test_people_view_respects_names_switch_group_size_and_is_audited(db, s
     admin = as_user("owner", admin=True)
 
     hidden = (await admin.get("/api/analytics/people")).json()  # 4 people, default k = 5
-    assert hidden["hidden"] == "small_group" and hidden["rows"] == []
+    assert hidden["hidden_reason"] == "small_group" and hidden["rows"] == []
 
     await store.put(db, Key.ANALYTICS_MIN_GROUP, "3")
     await db.commit()
     shown = (await admin.get("/api/analytics/people?days=7")).json()
-    assert shown["hidden"] is None and len(shown["rows"]) == 4
+    assert shown["hidden"] is False and shown["total"] == 4  # no member list yet: everyone counts
     export = await admin.get("/api/analytics/people.csv")
     assert export.status_code == 200 and export.text.startswith("# Chakshu usage per person")
 
     audit = (await db.scalars(select(AnalyticsAudit).order_by(AnalyticsAudit.created_at))).all()
     assert [(a.user_login, a.action, a.view) for a in audit] == [
-        ("owner", "view", "people"),
-        ("owner", "export", "people"),
+        ("owner", "people.directory.view", "people"),
+        ("owner", "people.export", "people"),
     ]
 
     await store.put(db, Key.ANALYTICS_SHOW_NAMES, "false")
     await db.commit()
-    assert (await admin.get("/api/analytics/people")).json()["hidden"] == "names_off"
+    assert (await admin.get("/api/analytics/people")).json()["hidden_reason"] == "names_off"
 
 
 async def test_findings_drill_down_and_cost(db, seed_runs, as_user):

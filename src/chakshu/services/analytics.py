@@ -5,6 +5,7 @@ cost something, including failed ones, because the bill does. Findings are
 dated by when they were posted. People appear only as a usage ledger (what they
 asked for, whose PRs were reviewed, what that cost), never with findings per
 author, and grouped numbers about fewer than `min_group` people are hidden.
+Logins are matched case-insensitively and shown as GitHub spells them.
 See helpers/analytics.py for the definitions of each rate.
 """
 
@@ -13,12 +14,14 @@ from dataclasses import asdict, dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 
-from sqlalchemy import Select, case, distinct, func, select, tuple_
+from sqlalchemy import Select, case, distinct, func, select, tuple_, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from chakshu.core.config import get_settings
 from chakshu.db.models import (
     AnalyticsAudit,
     FindingOutcome,
+    OrgMember,
     PostedFinding,
     Repo,
     Reviewer,
@@ -67,10 +70,10 @@ class Privacy:
 
 async def privacy(session: AsyncSession) -> Privacy:
     values = await store.get_many(session, Key.ANALYTICS_SHOW_NAMES, Key.ANALYTICS_MIN_GROUP)
-    return Privacy(
-        show_names=(values[Key.ANALYTICS_SHOW_NAMES] or "true") == "true",
-        min_group=max(int(values[Key.ANALYTICS_MIN_GROUP] or 5), calc.MIN_GROUP_FLOOR),
-    )
+    min_group = int(values[Key.ANALYTICS_MIN_GROUP] or 5)
+    if not calc.valid_min_group(min_group):  # stored before the rules changed
+        min_group = min(max(min_group, calc.MIN_GROUP_FLOOR), calc.MIN_GROUP_MAX)
+    return Privacy(show_names=(values[Key.ANALYTICS_SHOW_NAMES] or "true") == "true", min_group=min_group)
 
 
 def _runs(stmt: Select, f: Filters) -> Select:
@@ -261,48 +264,370 @@ async def breakdown(session: AsyncSession, f: Filters, by: Dimension) -> list[di
     return sorted(result, key=lambda r: (-r["spend"], -r.get("posted", 0), r["key"]))
 
 
-async def _names(session: AsyncSession, logins: set[str]) -> dict[str, str | None]:
-    if not logins:
-        return {}
-    users = (await session.execute(select(User.login, User.name).where(User.login.in_(logins)))).all()
-    return {u.login: u.name for u in users}
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
 
 
-async def people(session: AsyncSession, f: Filters, login: str | None = None) -> list[dict]:
-    """Usage per person, sorted by login. No findings per author, no ranks.
+def _asked(key: str):
+    return func.lower(Run.requested_by) == key
 
-    `login` limits it to one person (their own activity view).
+
+def _owns(key: str):
+    return func.lower(Run.pr_author) == key
+
+
+async def ledger(session: AsyncSession, f: Filters, key: str | None = None) -> dict[str, dict]:
+    """Usage per person in the slice, keyed by lowercase login. No findings per author, no ranks.
+
+    `key` (a lowercase login) limits it to one person.
     """
+    requester = func.lower(Run.requested_by)
     asked = _runs(
         select(
-            Run.requested_by.label("login"),
+            requester.label("key"),
+            func.min(Run.requested_by).label("login"),
             func.count().label("requested"),
+            func.count(case((Run.trigger == REPLY, 1))).label("replies"),
             func.coalesce(func.sum(Run.cost_usd), 0).label("cost"),
         ).where(Run.requested_by.is_not(None)),
         f,
-    ).group_by(Run.requested_by)
+    ).group_by(requester)
+    author = func.lower(Run.pr_author)
     authored = _runs(
         select(
-            Run.pr_author.label("login"),
+            author.label("key"),
+            func.min(Run.pr_author).label("login"),
             func.count(distinct(tuple_(Run.repo_id, Run.pr_number))).label("prs_reviewed"),
             func.count(case((Run.trigger == "auto", 1))).label("auto_reviews"),
         ).where(Run.pr_author.is_not(None), Run.pr_author != "", _review),
         f,
-    ).group_by(Run.pr_author)
-    if login:
-        asked = asked.where(Run.requested_by == login)
-        authored = authored.where(Run.pr_author == login)
+    ).group_by(author)
+    if key:
+        asked, authored = asked.where(requester == key), authored.where(author == key)
     rows: dict[str, dict] = {}
     for r in (await session.execute(asked)).all():
-        rows[r.login] = {"requested": r.requested, "cost_triggered": round(float(r.cost), 4)}
+        rows[r.key] = {
+            "login": r.login,
+            "requested": r.requested,
+            "replies": r.replies,
+            "cost_triggered": round(float(r.cost), 4),
+        }
     for r in (await session.execute(authored)).all():
-        rows.setdefault(r.login, {}).update({"prs_reviewed": r.prs_reviewed, "auto_reviews": r.auto_reviews})
-    names = await _names(session, set(rows))
+        rows.setdefault(r.key, {"login": r.login}).update(
+            {"prs_reviewed": r.prs_reviewed, "auto_reviews": r.auto_reviews}
+        )
+    for row in rows.values():
+        for name in ("requested", "replies", "prs_reviewed", "auto_reviews"):
+            row.setdefault(name, 0)
+        row.setdefault("cost_triggered", 0.0)
+        row["engaged"] = row["requested"] > 0
+        row["activity_state"] = calc.activity_state(row["requested"], row["prs_reviewed"])
+    return rows
+
+
+NO_USAGE = {
+    "requested": 0,
+    "replies": 0,
+    "prs_reviewed": 0,
+    "auto_reviews": 0,
+    "cost_triggered": 0.0,
+    "engaged": False,
+    "activity_state": "none",
+}
+
+
+async def people(session: AsyncSession, f: Filters, login: str | None = None) -> list[dict]:
+    """The ledger as rows sorted by login, with names. `login` limits it to one person (/api/analytics/me)."""
+    rows = await ledger(session, f, login.lower() if login else None)
+    users = {u.login.lower(): u.name for u in (await session.execute(select(User.login, User.name))).all()}
     result = []
-    for person in sorted(rows, key=str.lower):
-        row = {"requested": 0, "cost_triggered": 0.0, "prs_reviewed": 0, "auto_reviews": 0} | rows[person]
-        result.append(row | {"login": person, "name": names.get(person), "engaged": row["requested"] > 0})
+    for key in sorted(rows):
+        row = rows[key]
+        result.append(
+            {k: row[k] for k in ("requested", "prs_reviewed", "auto_reviews", "cost_triggered", "engaged")}
+            | {"login": row["login"], "name": users.get(key)}
+        )
     return result
+
+
+async def activity_dates(session: AsyncSession, keys: set[str]) -> dict[str, tuple[datetime, datetime]]:
+    """(first, last) time each person asked for a review or had a PR reviewed. All time, no filters."""
+    if not keys:
+        return {}
+    requester, author = func.lower(Run.requested_by), func.lower(Run.pr_author)
+    both = union_all(
+        select(requester.label("key"), Run.created_at).where(requester.in_(keys)),
+        select(author.label("key"), Run.created_at).where(author.in_(keys)),
+    ).subquery()
+    rows = await session.execute(
+        select(both.c.key, func.min(both.c.created_at), func.max(both.c.created_at)).group_by(both.c.key)
+    )
+    return {key: (first, last) for key, first, last in rows.all()}
+
+
+async def _profiles(session: AsyncSession, f: Filters, keys: set[str] | None) -> tuple[list[dict], bool]:
+    """Directory rows: the roster joined to the slice's usage and to portal sign-ins.
+
+    `keys` limits it to those people; None means every org member plus anyone active in the slice.
+    Returns the rows and whether a member list has been synced at all.
+    """
+    members = {m.login_lower: m for m in (await session.scalars(select(OrgMember))).all()}
+    users = {u.login.lower(): u for u in (await session.scalars(select(User))).all()}
+    usage = await ledger(session, f, next(iter(keys)) if keys and len(keys) == 1 else None)
+    if keys is None:
+        keys = {k for k, m in members.items() if m.in_org} | set(usage)
+    dates = await activity_dates(session, keys)
+    rows = []
+    for key in keys:
+        member, user, use = members.get(key), users.get(key), usage.get(key, {})
+        in_org = bool(member and member.in_org)
+        first, last = dates.get(key, (None, None))
+        login = member.login if member else user.login if user else use.get("login", key)
+        rows.append(
+            {
+                "login": login,
+                "name": (member and member.name) or (user and user.name) or None,
+                "avatar_url": (member and member.avatar_url) or (user and user.avatar_url) or None,
+                "org_role": member.org_role if member and in_org else None,
+                "in_org": in_org,
+                "is_portal_admin": bool(user and user.is_admin),
+                "last_login_at": _iso(user.last_login_at) if user else None,
+                **NO_USAGE,
+                **{k: v for k, v in use.items() if k != "login"},
+                "first_activity_at": _iso(first),
+                "last_activity_at": _iso(last),
+            }
+        )
+    return rows, bool(members)
+
+
+@dataclass(frozen=True)
+class DirectoryQuery:
+    q: str | None = None
+    role: Literal["owner", "member", "all"] = "all"
+    activity: Literal["all", "engaged", "auto_only", "none", "not_in_org"] = "all"
+    sort: calc.PeopleSort = "name"
+    order: Literal["asc", "desc"] | None = None
+
+
+DIRECTORY_FIELDS = (
+    "login",
+    "name",
+    "avatar_url",
+    "org_role",
+    "in_org",
+    "is_portal_admin",
+    "last_login_at",
+    "activity_state",
+    "requested",
+    "prs_reviewed",
+    "auto_reviews",
+    "engaged",
+    "cost_triggered",
+    "last_activity_at",
+)
+
+
+async def directory(session: AsyncSession, f: Filters, query: DirectoryQuery) -> dict:
+    """Everyone in the org with their usage in the slice, filtered and sorted (not paged).
+
+    `active` is how many people did anything in the slice, for the small-group check.
+    """
+    rows, roster_known = await _profiles(session, f, None)
+    active = sum(r["activity_state"] != "none" for r in rows)
+    if query.q:
+        needle = query.q.lower()
+        rows = [r for r in rows if needle in r["login"].lower() or needle in (r["name"] or "").lower()]
+    if query.role != "all":
+        rows = [r for r in rows if r["org_role"] == query.role]
+    # Without a synced member list (a personal account install), everyone counts as in the org.
+    in_scope = [r for r in rows if r["in_org"] or not roster_known]
+    counts = {"all": len(in_scope)} | {
+        state: sum(r["activity_state"] == state for r in in_scope)
+        for state in ("engaged", "auto_only", "none")
+    }
+    counts["not_in_org"] = len(rows) - len(in_scope)
+    if query.activity == "not_in_org":
+        rows = [r for r in rows if roster_known and not r["in_org"]]
+    elif query.activity == "all":
+        rows = in_scope
+    else:
+        rows = [r for r in in_scope if r["activity_state"] == query.activity]
+    order = query.order or ("asc" if query.sort == "name" else "desc")
+    rows = calc.sort_people(rows, query.sort, order)
+    return {
+        "active": active,
+        "counts": counts,
+        "rows": [{k: r[k] for k in DIRECTORY_FIELDS} for r in rows],
+    }
+
+
+async def canonical_login(session: AsyncSession, login: str) -> str | None:
+    """The login as GitHub spells it, from the member list, sign-ins or runs. None if Chakshu never saw it."""
+    key = login.lower()
+    for stmt in (
+        select(OrgMember.login).where(OrgMember.login_lower == key),
+        select(User.login).where(func.lower(User.login) == key),
+        select(Run.requested_by).where(_asked(key)),
+        select(Run.pr_author).where(_owns(key)),
+    ):
+        if found := await session.scalar(stmt.limit(1)):
+            return found
+    return None
+
+
+async def person(session: AsyncSession, login: str, f: Filters) -> dict:
+    """One person's profile: who they are, and when they last used Chakshu (all time)."""
+    rows, _ = await _profiles(session, f, {login.lower()})
+    row = rows[0]
+    return {
+        k: row[k]
+        for k in (
+            "login",
+            "name",
+            "avatar_url",
+            "org_role",
+            "in_org",
+            "is_portal_admin",
+            "last_login_at",
+            "first_activity_at",
+            "last_activity_at",
+            "activity_state",
+        )
+    } | {"github_url": f"{get_settings().github_url}/{row['login']}"}
+
+
+async def person_totals(session: AsyncSession, login: str, f: Filters) -> dict:
+    key = login.lower()
+    asked, owns = _asked(key), _owns(key)
+    row = (
+        (
+            await session.execute(
+                _runs(
+                    select(
+                        func.count(case((asked, 1))).label("requested"),
+                        func.count(
+                            distinct(case((owns & _review, tuple_(Run.repo_id, Run.pr_number))))
+                        ).label("prs_reviewed"),
+                        func.count(case((owns & _review & (Run.trigger == "auto"), 1))).label("auto_reviews"),
+                        func.count(case((asked & (Run.trigger == REPLY), 1))).label("replies"),
+                        func.count(case((asked & owns, 1))).label("self_requested_on_own_prs"),
+                        func.coalesce(func.sum(case((asked, Run.cost_usd))), 0).label("cost_triggered"),
+                        func.coalesce(func.sum(case((owns, Run.cost_usd))), 0).label("cost_on_own_prs"),
+                    ).where(asked | owns),
+                    f,
+                )
+            )
+        )
+        .one()
+        ._asdict()
+    )
+    return row | {k: round(float(row[k]), 4) for k in ("cost_triggered", "cost_on_own_prs")}
+
+
+BREAKDOWN_CAP = 9  # rows before the rest are added up as Other
+
+
+async def person_breakdowns(session: AsyncSession, login: str, f: Filters) -> dict:
+    """Runs a person asked for or whose PRs were reviewed, by trigger, repository and reviewer."""
+    key = login.lower()
+    involved = _asked(key) | _owns(key)
+    runs, spent = func.count().label("runs"), func.coalesce(func.sum(Run.cost_usd), 0).label("cost_usd")
+
+    async def grouped(*labels, extra=(), joins=()):
+        stmt = select(*labels, *extra, runs, spent)
+        for table, on in joins:
+            stmt = stmt.join(table, on)
+        stmt = _runs(stmt.where(involved), f).group_by(*labels)
+        return [
+            r._asdict() | {"cost_usd": round(float(r.cost_usd), 4)}
+            for r in (await session.execute(stmt.order_by(runs.desc(), *labels))).all()
+        ]
+
+    prs = func.count(distinct(tuple_(Run.repo_id, Run.pr_number))).label("prs")
+    by_repo = await grouped(
+        Repo.id.label("repo_id"),
+        Repo.full_name.label("repo"),
+        extra=[prs],
+        joins=[(Repo, Run.repo_id == Repo.id)],
+    )
+    by_repo = [r | {"repo_id": str(r["repo_id"])} for r in by_repo]
+    by_reviewer = await grouped(
+        Reviewer.name.label("reviewer"), joins=[(Reviewer, Run.reviewer_id == Reviewer.id)]
+    )
+    return {
+        "by_trigger": await grouped(Run.trigger.label("trigger")),
+        "by_repo": calc.top_with_other(
+            by_repo, BREAKDOWN_CAP, "repo", ("runs", "prs", "cost_usd"), repo_id=None
+        ),
+        "by_reviewer": calc.top_with_other(by_reviewer, BREAKDOWN_CAP, "reviewer", ("runs", "cost_usd")),
+    }
+
+
+async def person_daily(session: AsyncSession, login: str, f: Filters, days: int) -> list[dict]:
+    """One entry per day for the last `days` days. Runs on the partial first day count on the first entry."""
+    key = login.lower()
+    asked, owns = _asked(key), _owns(key)
+    day = func.date_trunc("day", Run.created_at)
+    found = (
+        await session.execute(
+            _runs(
+                select(
+                    day.label("day"),
+                    func.count(case((asked, 1))).label("requested"),
+                    func.count(distinct(case((owns & _review, tuple_(Run.repo_id, Run.pr_number))))).label(
+                        "own_prs_reviewed"
+                    ),
+                ).where(asked | owns),
+                f,
+            ).group_by(day)
+        )
+    ).all()
+    series = calc.last_days(f.end, days)
+    totals = {d: {"requested": 0, "own_prs_reviewed": 0} for d in series}
+    for r in found:
+        bucket = totals[max(r.day.date(), series[0])]
+        bucket["requested"] += r.requested
+        bucket["own_prs_reviewed"] += r.own_prs_reviewed
+    return [{"day": d.isoformat(), **totals[d]} for d in series]
+
+
+async def person_activity(
+    session: AsyncSession, login: str, f: Filters, *, cursor: str | None, limit: int
+) -> dict:
+    """A person's runs, newest first, a page at a time. The cursor is the last row's (created_at, id)."""
+    key = login.lower()
+    asked, owns = _asked(key), _owns(key)
+    stmt = (
+        _runs(select(Run, Repo.full_name, Reviewer.name).where(asked | owns), f)
+        .join(Repo, Run.repo_id == Repo.id)
+        .join(Reviewer, Run.reviewer_id == Reviewer.id)
+    )
+    if cursor:
+        when, run_id = calc.decode_cursor(cursor)
+        stmt = stmt.where(tuple_(Run.created_at, Run.id) < tuple_(when, run_id))
+    rows = (await session.execute(stmt.order_by(Run.created_at.desc(), Run.id.desc()).limit(limit + 1))).all()
+    items = []
+    for run, repo, reviewer in rows[:limit]:
+        mine = (run.requested_by or "").lower() == key, (run.pr_author or "").lower() == key
+        items.append(
+            {
+                "run_id": str(run.id),
+                "created_at": run.created_at.isoformat(),
+                "role": "both" if all(mine) else "requested" if mine[0] else "author",
+                "trigger": run.trigger,
+                "repo": repo,
+                "repo_id": str(run.repo_id),
+                "pr_number": run.pr_number,
+                "pr_title": run.pr_title,
+                "reviewer": reviewer,
+                "status": run.status,
+                "review_url": run.review_url,
+                "cost_usd": float(run.cost_usd) if run.cost_usd is not None else None,
+            }
+        )
+    last = rows[limit - 1][0] if len(rows) > limit else None
+    return {"items": items, "next_cursor": calc.encode_cursor(last.created_at, last.id) if last else None}
 
 
 async def cost(session: AsyncSession, today: date | None = None) -> dict:
@@ -352,14 +677,23 @@ async def findings(
     ]
 
 
-async def record_access(session: AsyncSession, login: str, action: str, view: str, f: Filters) -> None:
+async def record_access(
+    session: AsyncSession,
+    login: str,
+    action: str,
+    view: str,
+    filters: dict,
+    target_login: str | None = None,
+) -> None:
+    """Write one audit row and commit. `action` is e.g. people.detail.view; see AnalyticsAudit."""
     session.add(
         AnalyticsAudit(
             id=uuid.uuid4(),
             user_login=login,
             action=action,
             view=view,
-            filters=f.describe(),
+            filters=filters,
+            target_login=target_login,
             created_at=datetime.now(UTC),
         )
     )

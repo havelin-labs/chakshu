@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   apiGet,
-  apiPut,
+  apiPatch,
   type AnalyticsPrivacy,
   type AnalyticsRow,
   type CostView,
@@ -273,13 +273,17 @@ function BreakdownTab({ filters, by }: { filters: Filters; by: "repo" | "reviewe
 
 function PrivacyCard() {
   const queryClient = useQueryClient()
-  const settings = useQuery({ queryKey: ["analytics-privacy"], queryFn: () => apiGet<AnalyticsPrivacy>("/api/analytics/settings") })
+  const settings = useQuery({ queryKey: ["analytics-privacy"], queryFn: () => apiGet<AnalyticsPrivacy>("/api/settings/analytics") })
   // Unsaved edits, on top of what the server has.
   const [draft, setForm] = useState<AnalyticsPrivacy | null>(null)
   const form = draft ?? settings.data
   const save = useMutation({
-    mutationFn: (body: AnalyticsPrivacy) => apiPut<AnalyticsPrivacy>("/api/analytics/settings", body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["analytics"] }),
+    mutationFn: (body: AnalyticsPrivacy) => apiPatch<AnalyticsPrivacy>("/api/settings/analytics", body),
+    onSuccess: () => {
+      setForm(null)
+      queryClient.invalidateQueries({ queryKey: ["analytics-privacy"] })
+      queryClient.invalidateQueries({ queryKey: ["analytics"] })
+    },
   })
   if (!form) return null
   return (
@@ -296,7 +300,7 @@ function PrivacyCard() {
             <Input
               id="min-group"
               type="number"
-              min={3}
+              min={1}
               max={100}
               className="w-24"
               value={form.min_group}
@@ -310,8 +314,8 @@ function PrivacyCard() {
         <ErrorNotice error={save.error} />
         <p className="text-xs text-muted-foreground">
           Turn names off where a works council or employee agreement asks for it. Slices covering fewer people than the
-          smallest group size are hidden, so a filter can't single someone out. Every view and export of named people is
-          logged.
+          smallest group size are hidden, so a filter can't single someone out; 1 turns this off, otherwise use 3 to
+          100. Every view and export of named people is logged.
         </p>
       </CardContent>
     </Card>
@@ -321,7 +325,7 @@ function PrivacyCard() {
 function PeopleTab({ filters }: { filters: Filters }) {
   const data = useQuery({
     queryKey: ["analytics", "people", filters.query],
-    queryFn: () => apiGet<PeopleResult>(`/api/analytics/people?${filters.query}`),
+    queryFn: () => apiGet<PeopleResult>(`/api/analytics/people?${filters.query}&page_size=96`),
   })
   const result = data.data
   return (
@@ -341,8 +345,8 @@ function PeopleTab({ filters }: { filters: Filters }) {
             ) : null}
           </div>
           <ErrorNotice error={data.error} />
-          {result?.hidden === "names_off" && <Notice>Names are turned off for analytics.</Notice>}
-          {result?.hidden === "small_group" && (
+          {result?.hidden_reason === "names_off" && <Notice>Names are turned off for analytics.</Notice>}
+          {result?.hidden_reason === "small_group" && (
             <Notice>Fewer than {result.min_group} people in this selection, so it's hidden for privacy.</Notice>
           )}
           {result && !result.hidden && result.rows.length === 0 && <Notice>Nobody used Chakshu in this period.</Notice>}
