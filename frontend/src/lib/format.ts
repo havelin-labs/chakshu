@@ -24,3 +24,11 @@ export function duration(ms: number | null): string {
 }
 
 export const shortSha = (sha: string) => sha.slice(0, 7)
+
+export function percent(value: number | null): string {
+  return value == null ? "—" : `${Math.round(value * 100)}%`
+}
+
+export function count(value: number | null): string {
+  return value == null ? "—" : value.toLocaleString("en")
+}
