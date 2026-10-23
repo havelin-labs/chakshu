@@ -3,7 +3,7 @@
 import os
 from dataclasses import asdict
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from githubkit.exception import RequestFailed
 from pydantic import BaseModel, Field, field_validator
 
@@ -14,7 +14,16 @@ from chakshu.db.session import SessionDep
 from chakshu.helpers import analytics as calc
 from chakshu.helpers import workflow
 from chakshu.helpers.urls import is_public_url
-from chakshu.services import actions_secrets, analytics, app_permissions, github, model_access, setup, spend
+from chakshu.services import (
+    actions_secrets,
+    analytics,
+    app_permissions,
+    github,
+    model_access,
+    retention,
+    setup,
+    spend,
+)
 from chakshu.services import settings_store as store
 from chakshu.services.settings_store import Key
 
@@ -142,6 +151,9 @@ async def connect_webhooks(session: SessionDep, creds: CredentialsDep, _: AdminD
 class AnalyticsSettingsUpdate(BaseModel):
     show_names: bool | None = None
     min_group: int | None = None
+    # 0 keeps people on runs indefinitely; otherwise clear them after this many days.
+    retention_days: int | None = Field(default=None, ge=0, le=retention.MAX_DAYS)
+    export_people: bool | None = None
 
     @field_validator("min_group")
     @classmethod
@@ -166,14 +178,48 @@ async def update_analytics_settings(
     """Name people in analytics or not, and the smallest group shown (1 turns hiding off). Audited."""
     old = asdict(await analytics.privacy(session))
     new = old | body.model_dump(exclude_none=True)
+    if new["retention_days"] == 0:
+        new["retention_days"] = None
+    if new["retention_days"] is not None and new["retention_days"] < retention.MIN_DAYS:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"Keep people for at least {retention.MIN_DAYS} days, or use 0 to keep them.",
+        )
+    return await _save_privacy(session, user.login, "settings.analytics.update", old, new)
+
+
+async def _save_privacy(session: SessionDep, login: str, action: str, old: dict, new: dict) -> dict:
     await store.put_many(
         session,
         {
             Key.ANALYTICS_SHOW_NAMES: "true" if new["show_names"] else "false",
             Key.ANALYTICS_MIN_GROUP: str(new["min_group"]),
+            Key.ANALYTICS_RETENTION_DAYS: str(new["retention_days"]) if new["retention_days"] else None,
+            Key.ANALYTICS_EXPORT_PEOPLE: "true" if new["export_people"] else "false",
         },
     )
-    await analytics.record_access(
-        session, user.login, "settings.analytics.update", "settings", {"old": old, "new": new}
-    )
+    await analytics.record_access(session, login, action, "settings", {"old": old, "new": new})
     return new
+
+
+WORKS_COUNCIL_MIN_GROUP = 10
+
+
+@router.post("/analytics/works-council")
+async def works_council_mode(session: SessionDep, user: AdminDep) -> dict:
+    """One step for a works council or employee agreement: no names, larger groups, no person export."""
+    old = asdict(await analytics.privacy(session))
+    new = old | {
+        "show_names": False,
+        "min_group": max(old["min_group"], WORKS_COUNCIL_MIN_GROUP),
+        "export_people": False,
+    }
+    return await _save_privacy(session, user.login, "settings.analytics.works_council", old, new)
+
+
+@router.get("/analytics/audit")
+async def analytics_audit(
+    session: SessionDep, _: AdminDep, limit: int = Query(200, ge=1, le=1000)
+) -> list[dict]:
+    """Who looked at, exported or changed analytics about named people, newest first."""
+    return await analytics.audit_log(session, limit)

@@ -66,14 +66,28 @@ class Filters:
 class Privacy:
     show_names: bool
     min_group: int
+    retention_days: int | None = None  # None keeps who asked and who authored indefinitely
+    export_people: bool = True
 
 
 async def privacy(session: AsyncSession) -> Privacy:
-    values = await store.get_many(session, Key.ANALYTICS_SHOW_NAMES, Key.ANALYTICS_MIN_GROUP)
+    values = await store.get_many(
+        session,
+        Key.ANALYTICS_SHOW_NAMES,
+        Key.ANALYTICS_MIN_GROUP,
+        Key.ANALYTICS_RETENTION_DAYS,
+        Key.ANALYTICS_EXPORT_PEOPLE,
+    )
     min_group = int(values[Key.ANALYTICS_MIN_GROUP] or 5)
     if not calc.valid_min_group(min_group):  # stored before the rules changed
         min_group = min(max(min_group, calc.MIN_GROUP_FLOOR), calc.MIN_GROUP_MAX)
-    return Privacy(show_names=(values[Key.ANALYTICS_SHOW_NAMES] or "true") == "true", min_group=min_group)
+    retention = values[Key.ANALYTICS_RETENTION_DAYS]
+    return Privacy(
+        show_names=(values[Key.ANALYTICS_SHOW_NAMES] or "true") == "true",
+        min_group=min_group,
+        retention_days=int(retention) if retention else None,
+        export_people=(values[Key.ANALYTICS_EXPORT_PEOPLE] or "true") == "true",
+    )
 
 
 def _runs(stmt: Select, f: Filters) -> Select:
@@ -698,3 +712,20 @@ async def record_access(
         )
     )
     await session.commit()
+
+
+async def audit_log(session: AsyncSession, limit: int = 200) -> list[dict]:
+    """The newest audit rows: who viewed, exported or changed analytics about named people."""
+    rows = (
+        await session.scalars(select(AnalyticsAudit).order_by(AnalyticsAudit.created_at.desc()).limit(limit))
+    ).all()
+    return [
+        {
+            "at": row.created_at.isoformat(),
+            "user": row.user_login,
+            "action": row.action,
+            "target": row.target_login,
+            "details": row.filters,
+        }
+        for row in rows
+    ]
