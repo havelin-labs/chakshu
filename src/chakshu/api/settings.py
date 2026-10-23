@@ -12,6 +12,7 @@ from chakshu.core import crypto
 from chakshu.core.config import get_settings as get_config
 from chakshu.db.session import SessionDep
 from chakshu.helpers import workflow
+from chakshu.helpers.urls import is_public_url
 from chakshu.services import actions_secrets, app_permissions, github, model_access, setup, spend
 from chakshu.services import settings_store as store
 from chakshu.services.settings_store import Key
@@ -63,6 +64,7 @@ async def _read(session: SessionDep) -> dict:
         "reviewers_repo": values[Key.REVIEWERS_REPO],
         "actions_action": values[Key.ACTIONS_ACTION] or workflow.DEFAULT_ACTION,
         "runner_url": get_config().public_runner_url,
+        "runner_public": is_public_url(get_config().public_runner_url),
         "webhooks": {
             "url": get_config().hook_url,
             "public": setup.webhooks_reachable(),

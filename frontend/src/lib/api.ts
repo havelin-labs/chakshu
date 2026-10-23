@@ -152,6 +152,7 @@ export type AdminSettings = {
   reviewers_repo: string
   actions_action: string
   runner_url: string
+  runner_public: boolean
   webhooks: { url: string; public: boolean; secret_set: boolean; events: string[] }
 }
 
