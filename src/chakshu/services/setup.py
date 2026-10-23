@@ -32,7 +32,8 @@ APP_PERMISSIONS = {
     "workflows": "write",  # propose .github/workflows/chakshu.yml
     "secrets": "write",  # keep the Claude credential in each repo's Actions secrets
 }
-APP_EVENTS = ["pull_request", "issue_comment", "push", "workflow_run"]
+# pull_request_review_comment: someone replied to one of Chakshu's review comments
+APP_EVENTS = ["pull_request", "issue_comment", "pull_request_review_comment", "push", "workflow_run"]
 
 
 def new_setup_code() -> str:

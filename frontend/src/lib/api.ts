@@ -149,19 +149,29 @@ export type Finding = {
   skill?: string
 }
 
+export type ReviewResult = {
+  summary: string
+  findings: Finding[]
+  posted: number
+  summary_only: number
+  repeats: number
+  since?: string | null
+  resolved?: number
+}
+
+// A reply run answered someone in one of Chakshu's review threads, and may have settled the finding.
+export type ReplyResult = {
+  reply: string
+  outcome?: "open" | "fixed" | "dismissed"
+  resolved?: boolean
+  turns?: number | null
+}
+
 export type RunDetail = Run & {
   note: string | null
   error: string | null
   attempts: number
-  result: {
-    summary: string
-    findings: Finding[]
-    posted: number
-    summary_only: number
-    repeats: number
-    since?: string | null
-    resolved?: number
-  } | null
+  result: ReviewResult | ReplyResult | null
 }
 
 export type Repo = { id: string; full_name: string; private: boolean; enabled: boolean }

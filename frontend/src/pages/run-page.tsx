@@ -70,7 +70,7 @@ export function RunPage() {
                 )}
                 {data.review_url && (
                   <a className={buttonVariants()} href={data.review_url} target="_blank" rel="noreferrer">
-                    Open review
+                    {data.trigger === "reply" ? "Open answer" : "Open review"}
                   </a>
                 )}
               </div>
@@ -98,7 +98,19 @@ export function RunPage() {
           </Card>
           {data.note && <Notice>Note from the requester: {data.note}</Notice>}
           {data.error && <Notice tone="error">{data.error}</Notice>}
-          {data.result && (
+          {data.result && "reply" in data.result && (
+            <Card>
+              <CardContent>
+                <h2 className="text-xl font-bold">Answer</h2>
+                <p className="mt-2 text-sm whitespace-pre-wrap">{data.result.reply}</p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Finding {data.result.outcome === "open" || !data.result.outcome ? "left open" : `marked ${data.result.outcome}`}
+                  {data.result.resolved && ". Resolved the thread"}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+          {data.result && "findings" in data.result && (
             <Card>
               <CardContent className="space-y-4">
                 <div>

@@ -6,10 +6,14 @@
     POST /api/runner/runs/{id}/failure                  Failure
 
 Every request carries the Actions OIDC token as a bearer token.
+
+A job is a review, or (kind "reply") an answer to someone who replied to one of
+Chakshu's review comments. A reply job's Result carries the answer in `summary`,
+no findings, and the finding's `outcome`: open, fixed or dismissed.
 """
 
 import uuid
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -30,6 +34,7 @@ class Job(BaseModel):
     # Files for the agent's working directory, by relative path: CLAUDE.md and .claude/skills/...
     files: dict[str, str]
     connectors: list[ConnectorTools] = Field(default_factory=list)
+    kind: Literal["review", "reply"] = "review"
 
 
 class ToolCall(BaseModel):
@@ -47,6 +52,7 @@ class Result(BaseModel):
     cost_usd: float | None = None
     duration_ms: int | None = None
     turns: int | None = None
+    outcome: Literal["open", "fixed", "dismissed"] | None = None  # reply jobs only
 
 
 class Failure(BaseModel):

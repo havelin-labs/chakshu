@@ -16,7 +16,7 @@ from chakshu.db.models import Run, RunStatus
 from chakshu.db.session import SessionDep
 from chakshu.helpers import workflow
 from chakshu.runner.protocol import API_PREFIX, Failure, Job, Result, ToolCall, ToolReply
-from chakshu.services import connectors, jobs, oidc, review_results
+from chakshu.services import connectors, jobs, oidc, replies, review_results
 from chakshu.services.jobs import RunContext
 
 log = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ RunnerDep = Annotated[RunContext, Depends(runner_context)]
 @router.post("/{run_id}/job")
 async def get_job(ctx: RunnerDep, session: SessionDep) -> Job:
     try:
-        job = await jobs.build(session, ctx)
+        job = await (replies.build_job if ctx.run.reply_to else jobs.build)(session, ctx)
     except jobs.Superseded as exc:
         await review_results.fail(
             ctx,
@@ -84,7 +84,7 @@ async def get_job(ctx: RunnerDep, session: SessionDep) -> Job:
         await review_results.fail(ctx, f"Couldn't prepare the review: {exc}")
         await session.commit()
         raise HTTPException(status.HTTP_409_CONFLICT, ctx.run.error) from exc
-    ctx.run.progress = f"Reviewing with {job.model}"
+    ctx.run.progress = f"{'Answering' if job.kind == 'reply' else 'Reviewing'} with {job.model}"
     await session.commit()
     return job
 

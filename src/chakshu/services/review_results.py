@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from chakshu.db.models import Run, RunStatus
 from chakshu.helpers import findings
 from chakshu.runner.protocol import Result
-from chakshu.services import checks, finding_stats, jobs, publisher, runs, triggers
+from chakshu.services import checks, finding_stats, jobs, publisher, replies, runs, triggers
 from chakshu.services.jobs import RunContext
 
 log = logging.getLogger(__name__)
@@ -42,7 +42,26 @@ async def _patches(ctx: RunContext) -> dict[str, str | None]:
     return dict(changed or [])
 
 
+async def _complete_reply(session: AsyncSession, ctx: RunContext, result: Result) -> None:
+    run = ctx.run
+    run.cost_usd = _cost(result.cost_usd)
+    run.duration_ms = result.duration_ms
+    run.review_url = await replies.post(ctx, result)
+    resolved = await replies.settle(session, ctx, result.outcome)
+    run.result = {
+        "reply": result.summary,
+        "outcome": result.outcome or "open",
+        "resolved": resolved,
+        "turns": result.turns,
+    }
+    run.status, run.error = RunStatus.SUCCEEDED, None
+    run.finished_at, run.progress = datetime.now(UTC), None
+
+
 async def complete(session: AsyncSession, ctx: RunContext, result: Result) -> None:
+    if ctx.run.reply_to:
+        await _complete_reply(session, ctx, result)
+        return
     run, repo, reviewer = ctx.run, ctx.repo, ctx.reviewer
     client = ctx.client
     since = (run.result or {}).get("since")

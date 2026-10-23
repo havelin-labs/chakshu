@@ -32,6 +32,8 @@ Then open `CHAKSHU_BASE_URL` in a browser:
 
 Comment `@<org>/chakshu` on a pull request, or press **Review** on its page in the portal.
 
+Reply to one of Chakshu's inline comments and the reviewer that posted it answers in the thread, in a short Actions run of the same workflow. If the reply shows the finding is fixed or wrong, it resolves the thread, and the finding counts as fixed or dismissed in the stats. The pull request's author and anyone with write access get answers, up to five per thread. A GitHub App created before replies were added needs the **Pull request review comment** event turned on; Settings shows when it's missing.
+
 GitHub has to reach `CHAKSHU_BASE_URL` (or `CHAKSHU_WEBHOOK_URL`) for mentions and automatic reviews to work, and Actions runners have to reach `CHAKSHU_RUNNER_URL` (or `CHAKSHU_BASE_URL`) for any review to finish. Reviews started from the portal work without webhooks.
 
 On a laptop, neither is reachable from the internet, so Compose has two optional helpers. For webhooks, point `CHAKSHU_WEBHOOK_URL` at a smee.io channel before step 2 and start `docker compose --profile smee up -d`. For runners, start `docker compose --profile tunnel up -d`, which opens a Cloudflare quick tunnel to the portal. Copy the `https://<random>.trycloudflare.com` address from `docker compose logs tunnel` into `CHAKSHU_RUNNER_URL` and run `docker compose up -d web worker` so they pick it up. Quick tunnels get a new address each time they start, so repeat this after a restart.

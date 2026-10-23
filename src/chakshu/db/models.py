@@ -123,7 +123,7 @@ class JobMixin:
 
 
 class Run(Base, JobMixin, TimestampMixin):
-    """One reviewer reviewing one pull request at one commit. Doubles as the job queue."""
+    """One reviewer reviewing one pull request at one commit, or answering a reply. Also the job queue."""
 
     __tablename__ = "runs"
 
@@ -135,7 +135,7 @@ class Run(Base, JobMixin, TimestampMixin):
     pr_title: Mapped[str | None] = mapped_column(String(500))
     head_sha: Mapped[str] = mapped_column(String(40))
     reviewer_sha: Mapped[str] = mapped_column(String(40))
-    trigger: Mapped[str] = mapped_column(String(30))  # mention | review_requested | auto | portal
+    trigger: Mapped[str] = mapped_column(String(30))  # mention | review_requested | auto | portal | reply
     requested_by: Mapped[str | None] = mapped_column(String(100))
     note: Mapped[str | None] = mapped_column(Text)
     progress: Mapped[str | None] = mapped_column(Text)
@@ -148,6 +148,8 @@ class Run(Base, JobMixin, TimestampMixin):
     # The GitHub Actions run doing the review. Only that run may fetch the job and report back.
     actions_run_id: Mapped[int | None] = mapped_column(BigInteger, index=True)
     actions_run_url: Mapped[str | None] = mapped_column(String(500))
+    # Set for reply runs: the first comment of the Chakshu thread someone answered. The reply goes there.
+    reply_to: Mapped[int | None] = mapped_column(BigInteger)
 
     __table_args__ = (Index("ix_runs_status_created_at", "status", "created_at"),)
 
