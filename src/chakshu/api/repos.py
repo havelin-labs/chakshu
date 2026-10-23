@@ -20,6 +20,8 @@ class RepoUpdate(BaseModel):
 
 class ReviewBody(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
+    # Reviewers to run by name; none means the ones that cover the repo and files.
+    reviewers: list[str] | None = Field(default=None, max_length=20)
 
 
 async def _load(session: SessionDep, repo_id: uuid.UUID) -> tuple[Repo, Installation]:
@@ -134,6 +136,7 @@ async def request_review(
             source_id=f"portal:{user.login}",
             requester=user.login,
             note=body.note,
+            reviewers=body.reviewers,
         ),
     )
     await session.commit()
