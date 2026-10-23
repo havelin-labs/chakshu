@@ -4,7 +4,7 @@
 
 Chakshu (चक्षु, Sanskrit for "the eye") is a self-hosted pull request reviewer for GitHub.
 
-Each team in your organization keeps its own reviewer: a folder with skills, rules and settings in one repo. Anyone on that team comments `@your-org/chakshu` on a pull request, and Chakshu runs the reviewers that belong to them and fit the change. Each one posts its own review and check. Reviews run on the Claude Agent SDK with read-only tools.
+Each team in your organization keeps its own reviewer: a folder with skills, rules and settings in one repo. Anyone on that team comments `@your-org/chakshu` on a pull request, and Chakshu runs the reviewers that belong to them and fit the change. Each one posts its own review and check. Reviews run in GitHub Actions in the pull request's own repository, so the logs are in its Actions tab, on the Claude Agent SDK with read-only tools.
 
 Docs: https://chakshu.havelin.in/docs
 
@@ -40,7 +40,9 @@ GitHub has to reach `CHAKSHU_BASE_URL` (or `CHAKSHU_WEBHOOK_URL`) for mentions a
 | `db` | Postgres 17 |
 | `migrate` | Applies migrations, then exits |
 | `web` | Portal, API and the GitHub webhook endpoint on port 8000 |
-| `worker` | Claims queued reviews and runs them (`CHAKSHU_WORKER_CONCURRENCY` at a time) |
+| `worker` | Handles webhooks and starts each queued review as a GitHub Actions run |
+
+The review itself runs on a GitHub Actions runner in the reviewed repository. It signs in to Chakshu with the run's OIDC token, fetches the job, runs Claude and sends the findings back; Chakshu posts them. Runners must be able to reach `CHAKSHU_RUNNER_URL` (which defaults to `CHAKSHU_BASE_URL`).
 
 ## Develop
 
