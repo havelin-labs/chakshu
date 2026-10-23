@@ -337,7 +337,14 @@ export type FindingRow = {
   outcome_source: "code_change" | "thread_resolved" | "reply" | null
 }
 
-export type AnalyticsPrivacy = { show_names: boolean; min_group: number }
+export type AnalyticsPrivacy = {
+  show_names: boolean
+  min_group: number
+  retention_days: number | null
+  export_people: boolean
+}
+
+export type AuditRow = { at: string; user: string; action: string; target: string | null; details: Record<string, unknown> }
 export type PersonTotals = {
   requested: number
   prs_reviewed: number
