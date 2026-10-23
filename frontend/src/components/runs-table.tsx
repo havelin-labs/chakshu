@@ -2,7 +2,7 @@ import { Link } from "react-router-dom"
 
 import { StatusBadge } from "@/components/status-badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import type { Run } from "@/lib/api"
+import { isLive, type Run } from "@/lib/api"
 import { cost, duration, timeAgo } from "@/lib/format"
 
 export function RunsTable({ runs }: { runs: Run[] }) {
@@ -53,4 +53,4 @@ export function RunsTable({ runs }: { runs: Run[] }) {
 }
 
 export const isActive = (runs: Run[] | undefined) =>
-  Boolean(runs?.some((r) => r.status === "queued" || r.status === "running"))
+  Boolean(runs?.some((r) => isLive(r.status)))

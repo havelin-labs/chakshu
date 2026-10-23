@@ -5,6 +5,7 @@ const VARIANTS: Record<string, "default" | "outline" | "secondary" | "destructiv
   ok: "default",
   succeeded: "default",
   running: "secondary",
+  dispatched: "secondary",
   queued: "outline",
   checking: "outline",
   cancelled: "outline",
