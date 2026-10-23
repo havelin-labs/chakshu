@@ -49,15 +49,17 @@ class Worker:
             event = await queue.claim(session, WebhookEvent, self.id)
             if event is None:
                 return False
+            # Read these now: after a rollback the object is expired and touching it would hit the DB lazily.
+            event_id, event_name = event.id, event.event
             try:
                 await handlers.handle(session, event)
                 await session.commit()
                 error = None
             except Exception as exc:  # noqa: BLE001 - recorded on the event, retried by the queue
-                log.exception("Webhook %s (%s) failed", event.event, event.id)
+                log.exception("Webhook %s (%s) failed", event_name, event_id)
                 await session.rollback()
                 error = exc
-            event = await session.get(WebhookEvent, event.id, populate_existing=True)
+            event = await session.get(WebhookEvent, event_id, populate_existing=True)
             await queue.finish(session, event, error)
             return True
 
