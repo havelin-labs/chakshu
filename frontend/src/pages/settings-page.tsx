@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState, type FormEvent } from "react"
 
 import { ActionsCard } from "@/components/actions-card"
+import { AlertsCard } from "@/components/alerts-card"
 import { ConnectorsCard } from "@/components/connectors-card"
 import { Field } from "@/components/field"
 import { WebhooksCard } from "@/components/webhooks-card"
@@ -189,7 +190,8 @@ export function SettingsPage() {
       <Card className="mt-6">
         <CardContent className="space-y-3">
           <h2 className="text-xl font-bold">Review team</h2>
-          <ReviewTeam />
+          <AlertsCard />
+      <ReviewTeam />
         </CardContent>
       </Card>
       <ConnectorsCard />
