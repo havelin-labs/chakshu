@@ -7,6 +7,7 @@ import { Field } from "@/components/field"
 import { WebhooksCard } from "@/components/webhooks-card"
 import { ErrorNotice, Notice } from "@/components/notice"
 import { PageHeader } from "@/components/page-header"
+import { ReviewTeam } from "@/components/review-team"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -185,6 +186,12 @@ export function SettingsPage() {
       </Card>
       {settings.data && <WebhooksCard webhooks={settings.data.webhooks} />}
       {settings.data && <ActionsCard runnerUrl={settings.data.runner_url} runnerPublic={settings.data.runner_public} />}
+      <Card className="mt-6">
+        <CardContent className="space-y-3">
+          <h2 className="text-xl font-bold">Review team</h2>
+          <ReviewTeam />
+        </CardContent>
+      </Card>
       <ConnectorsCard />
     </section>
   )

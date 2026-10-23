@@ -26,7 +26,7 @@ APP_PERMISSIONS = {
     "pull_requests": "write",
     "checks": "write",
     "issues": "write",
-    "members": "read",
+    "members": "write",  # read who's an org owner; create the empty chakshu team during setup
     "metadata": "read",
     "actions": "write",  # start the review workflow and hear when it ends
     "workflows": "write",  # propose .github/workflows/chakshu.yml
