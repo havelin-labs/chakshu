@@ -55,14 +55,21 @@ export function DailyBars({
         <button
           type="button"
           className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+          aria-pressed={asTable}
           onClick={() => setAsTable(!asTable)}
         >
-          {asTable ? "Show chart" : "Show table"}
+          {asTable ? "View as chart" : "View as table"}
         </button>
       </figcaption>
       {asTable ? (
         <div className="max-h-56 overflow-auto rounded-[4px] border">
           <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-card">
+              <tr className="border-b text-left">
+                <th className="px-3 py-1.5 font-medium">Day</th>
+                <th className="px-3 py-1.5 text-right font-medium">{title}</th>
+              </tr>
+            </thead>
             <tbody>
               {points.map((p) => (
                 <tr key={p.label} className="border-b last:border-0">
@@ -147,5 +154,43 @@ export function CapMeter({ spent, projected, cap }: { spent: number; projected: 
         <span>Cap (solid line)</span>
       </div>
     </div>
+  )
+}
+
+// A short list of labeled bars, each value written beside its bar.
+export function HorizontalBars({
+  title,
+  rows,
+  format = (v) => String(v),
+}: {
+  title: string
+  rows: { key: string; label: string; value: number; detail?: string }[]
+  format?: (value: number) => string
+}) {
+  const max = Math.max(...rows.map((r) => r.value), 0)
+  return (
+    <figure className="space-y-2">
+      <figcaption className="text-sm font-semibold">{title}</figcaption>
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nothing in this period.</p>
+      ) : (
+        <dl className="space-y-2">
+          {rows.map((r) => (
+            <div key={r.key} className="grid grid-cols-[minmax(0,10rem)_1fr_auto] items-center gap-3 text-sm">
+              <dt className="truncate" title={r.label}>
+                {r.label}
+              </dt>
+              <span aria-hidden className="h-2 overflow-hidden rounded-full bg-muted">
+                <span className="block h-full rounded-full bg-chart-1" style={{ width: `${max ? Math.max((r.value / max) * 100, r.value ? 2 : 0) : 0}%` }} />
+              </span>
+              <dd className="text-right tabular-nums">
+                {format(r.value)}
+                {r.detail && <span className="block text-xs text-muted-foreground">{r.detail}</span>}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </figure>
   )
 }

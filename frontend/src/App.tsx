@@ -6,8 +6,8 @@ import { RequireUser } from "@/components/require-user"
 import { AnalyticsPage } from "@/pages/analytics-page"
 import { InsightsPage } from "@/pages/insights-page"
 import { LoginPage } from "@/pages/login-page"
-import { MyActivityPage } from "@/pages/my-activity-page"
 import { PeoplePage } from "@/pages/people-page"
+import { MyPage, PersonPage } from "@/pages/person-page"
 import { RepoPage } from "@/pages/repo-page"
 import { ReposPage } from "@/pages/repos-page"
 import { ReviewerEditPage } from "@/pages/reviewer-edit-page"
@@ -35,8 +35,9 @@ const router = createBrowserRouter([
       { path: "/insights", element: signedIn(<InsightsPage />) },
       { path: "/analytics", element: signedIn(<AnalyticsPage />, true) },
       { path: "/analytics/people", element: signedIn(<PeoplePage />) },
-      { path: "/analytics/me", element: <Navigate to="/me" replace /> },
-      { path: "/me", element: signedIn(<MyActivityPage />) },
+      { path: "/analytics/people/:login", element: signedIn(<PersonPage />) },
+      { path: "/analytics/me", element: signedIn(<MyPage />) },
+      { path: "/me", element: <Navigate to="/analytics/me" replace /> },
       { path: "/settings", element: signedIn(<SettingsPage />, true) },
       { path: "/status", element: signedIn(<StatusPage />) },
       { path: "/login", element: <LoginPage /> },
