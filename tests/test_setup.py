@@ -29,6 +29,7 @@ def test_setup_code_format():
 
 def test_manifest_skips_webhooks_for_local_urls(monkeypatch):
     monkeypatch.setenv("CHAKSHU_BASE_URL", "http://localhost:8000")
+    monkeypatch.setenv("CHAKSHU_WEBHOOK_URL", "")  # don't pick up a smee URL from .env
     get_settings.cache_clear()
     try:
         manifest = setup.build_manifest("chakshu-acme")
@@ -41,6 +42,7 @@ def test_manifest_skips_webhooks_for_local_urls(monkeypatch):
 
 def test_manifest_includes_webhooks_for_public_urls(monkeypatch):
     monkeypatch.setenv("CHAKSHU_BASE_URL", "https://chakshu.example.com")
+    monkeypatch.setenv("CHAKSHU_WEBHOOK_URL", "")
     get_settings.cache_clear()
     try:
         manifest = setup.build_manifest("chakshu-acme")
