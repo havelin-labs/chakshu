@@ -35,27 +35,21 @@ export function PersonCard({
 }) {
   const display = row.name ?? row.login
   return (
-    <Card className="relative h-full transition-[box-shadow,translate] focus-within:ring-2 focus-within:ring-ring motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-md">
+    <Card className="relative h-full min-h-72 transition-[box-shadow,translate] focus-within:ring-2 focus-within:ring-ring motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-md">
       <div className="flex items-start gap-3 px-(--card-spacing)">
-        <PersonAvatar row={row} className="size-10" />
-        <div className="min-w-0 flex-1">
-          <h3 className="font-heading text-base leading-snug font-semibold">
-            <Link
-              to={to}
-              state={{ from }}
-              title={display}
-              className="block truncate after:absolute after:inset-0 focus-visible:outline-none"
-            >
+        <PersonAvatar row={row} className="size-11 shrink-0" />
+        <div className="min-w-0 flex-1 space-y-1">
+          {/* Names wrap instead of being cut off; the card height absorbs a second line. */}
+          <h3 className="font-heading text-base leading-snug font-semibold break-words">
+            <Link to={to} state={{ from }} className="after:absolute after:inset-0 focus-visible:outline-none">
               {display}
             </Link>
           </h3>
-          <p className="truncate text-sm text-muted-foreground" title={`@${row.login}`}>
-            @{row.login}
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <Badge variant="secondary">{roleBadge(row)}</Badge>
-          {row.is_portal_admin && <Badge variant="outline">Portal admin</Badge>}
+          <p className="text-sm break-all text-muted-foreground">@{row.login}</p>
+          <div className="flex flex-wrap gap-1 pt-1">
+            <Badge variant="secondary">{roleBadge(row)}</Badge>
+            {row.is_portal_admin && <Badge variant="outline">Portal admin</Badge>}
+          </div>
         </div>
       </div>
       <CardContent className="flex-1 space-y-3">
@@ -104,7 +98,7 @@ export function PersonCard({
 
 export function PersonCardSkeleton() {
   return (
-    <Card className="h-full" aria-hidden="true">
+    <Card className="h-full min-h-72" aria-hidden="true">
       <CardHeader className="grid-cols-[auto_1fr] gap-x-3">
         <Skeleton className="row-span-2 size-10 rounded-full" />
         <Skeleton className="h-4 w-32" />
@@ -120,7 +114,7 @@ export function PersonCardSkeleton() {
 
 export function PersonCardGrid({ children }: { children: ReactNode }) {
   return (
-    <ul role="list" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <ul role="list" className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
       {children}
     </ul>
   )

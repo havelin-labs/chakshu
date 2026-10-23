@@ -4,7 +4,7 @@ import type { ActivityState, DirectoryRow } from "@/lib/api"
 import { timeAgo } from "@/lib/format"
 
 export const PERIODS = [7, 30, 90, 180, 365] as const
-export const PAGE_SIZES = [24, 48, 96] as const
+export const PAGE_SIZES = [12, 24, 48] as const // multiples of 2 and 3, so rows of cards come out even
 export const SORTS = ["name", "last_activity", "requested", "prs_reviewed", "cost"] as const
 export const ROLES = ["all", "owner", "member"] as const
 export const ACTIVITIES = ["all", "engaged", "auto_only", "none", "not_in_org"] as const
@@ -42,7 +42,7 @@ export const DEFAULTS: DirectoryParams = {
   order: "asc",
   view: null,
   page: 1,
-  page_size: 24,
+  page_size: 12,
 }
 
 function pick<T extends readonly (string | number)[]>(options: T, raw: string | null, fallback: T[number]): T[number] {
