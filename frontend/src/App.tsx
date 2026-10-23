@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { createBrowserRouter, RouterProvider } from "react-router-dom"
+import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom"
 
 import { Layout } from "@/components/layout"
 import { RequireUser } from "@/components/require-user"
@@ -7,6 +7,7 @@ import { AnalyticsPage } from "@/pages/analytics-page"
 import { InsightsPage } from "@/pages/insights-page"
 import { LoginPage } from "@/pages/login-page"
 import { MyActivityPage } from "@/pages/my-activity-page"
+import { PeoplePage } from "@/pages/people-page"
 import { RepoPage } from "@/pages/repo-page"
 import { ReposPage } from "@/pages/repos-page"
 import { ReviewerEditPage } from "@/pages/reviewer-edit-page"
@@ -33,6 +34,8 @@ const router = createBrowserRouter([
       { path: "/reviewers/:id/edit", element: signedIn(<ReviewerEditPage />) },
       { path: "/insights", element: signedIn(<InsightsPage />) },
       { path: "/analytics", element: signedIn(<AnalyticsPage />, true) },
+      { path: "/analytics/people", element: signedIn(<PeoplePage />) },
+      { path: "/analytics/me", element: <Navigate to="/me" replace /> },
       { path: "/me", element: signedIn(<MyActivityPage />) },
       { path: "/settings", element: signedIn(<SettingsPage />, true) },
       { path: "/status", element: signedIn(<StatusPage />) },
