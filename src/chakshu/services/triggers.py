@@ -26,8 +26,9 @@ class ReviewRequest:
     trigger: str  # mention | review_requested | auto | portal
     source_id: str  # what caused it (comment id, delivery id), part of the run id
     requester: str | None = None  # GitHub login; None for automatic runs
-    note: str | None = None
+    note: str | None = None  # for mentions, may start with reviewer names
     event: str | None = None  # PR action for automatic runs
+    reviewers: list[str] | None = None  # names picked in the portal
 
 
 @dataclass
@@ -39,21 +40,6 @@ class Outcome:
     @property
     def ok(self) -> bool:
         return self.refused is None
-
-
-async def _caller_teams(
-    creds: AppCredentials, installation: Installation, login: str, candidates: list[Reviewer]
-) -> set[str] | None:
-    """Teams of the caller among the candidates' owners. None means "may run any"."""
-    if installation.account_type == "User":
-        return None
-    org = installation.account_login
-    if await orgs.org_role(creds, installation.github_id, org, login) == "admin":
-        return None
-    teams = {r.owner_team for r in candidates}
-    return {
-        team for team in teams if await orgs.is_team_member(creds, installation.github_id, org, team, login)
-    }
 
 
 async def request_review(session: AsyncSession, creds: AppCredentials, req: ReviewRequest) -> Outcome:
@@ -76,24 +62,31 @@ async def request_review(session: AsyncSession, creds: AppCredentials, req: Revi
         if not orgs.can_write(permission):
             return Outcome(refused=messages.needs_write_access(req.requester))
 
-    files = [
-        f.filename
-        async for f in client.rest.paginate(
-            client.rest.pulls.async_list_files, owner=owner, repo=name, pull_number=req.pr_number
-        )
-    ]
-    reviewers = list(
-        (await session.scalars(select(Reviewer).where(Reviewer.installation_id == req.installation.id))).all()
-    )
-    candidates = selection.applicable(reviewers, req.repo.full_name, files, event=req.event)
-    if req.requester:
-        teams = await _caller_teams(creds, req.installation, req.requester, candidates)
-        chosen = selection.for_caller(candidates, teams) or selection.fallback(reviewers, req.repo.full_name)
-        if not chosen:
-            owners = [(r.name, f"{req.installation.account_login}/{r.owner_team}") for r in candidates]
-            return Outcome(refused=messages.nothing_matched(req.requester, owners))
+    query = select(Reviewer).where(Reviewer.installation_id == req.installation.id).order_by(Reviewer.name)
+    reviewers = list((await session.scalars(query)).all())
+    available = [r.name for r in reviewers if not r.errors]
+    note = req.note
+    if req.reviewers:
+        chosen, unknown = selection.by_names(reviewers, req.reviewers)
+        if unknown:
+            return Outcome(refused=messages.unknown_reviewers(req.requester, unknown, available))
     else:
-        chosen = candidates
+        # Named reviewers run whatever their repos and paths say; the rest of the note goes to them.
+        chosen, note = selection.pick_named(reviewers, note) if req.requester and note else ([], note)
+
+    if not chosen:
+        files = [
+            f.filename
+            async for f in client.rest.paginate(
+                client.rest.pulls.async_list_files, owner=owner, repo=name, pull_number=req.pr_number
+            )
+        ]
+        chosen = selection.applicable(reviewers, req.repo.full_name, files, event=req.event)
+        if req.requester and not chosen:
+            chosen = selection.fallback(reviewers, req.repo.full_name)
+            if not chosen:
+                handle = mentions.handle(req.installation.account_login)
+                return Outcome(refused=messages.nothing_matched(req.requester, handle, available))
 
     outcome = Outcome()
     for reviewer in chosen:
@@ -108,7 +101,7 @@ async def request_review(session: AsyncSession, creds: AppCredentials, req: Revi
             trigger=req.trigger,
             source_id=req.source_id,
             requested_by=req.requester,
-            note=req.note,
+            note=note or None,
         )
         (outcome.queued if added else outcome.already).append(reviewer.name)
     log.info(
