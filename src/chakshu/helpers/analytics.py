@@ -60,7 +60,7 @@ class Forecast:
 def forecast(spent: float, cap: float | None, today: date) -> Forecast:
     days_in_month = monthrange(today.year, today.month)[1]
     per_day = spent / today.day
-    projected = round(per_day * days_in_month, 2)
+    projected = round(per_day * days_in_month, 4)
     hit_on = None
     if cap and per_day > 0:
         if spent >= cap:
@@ -69,7 +69,7 @@ def forecast(spent: float, cap: float | None, today: date) -> Forecast:
             days_left = (cap - spent) / per_day
             day = today + timedelta(days=int(days_left) + 1)
             hit_on = day if day.month == today.month else None
-    return Forecast(month_to_date=round(spent, 2), projected=projected, cap=cap, cap_hit_on=hit_on)
+    return Forecast(month_to_date=round(spent, 4), projected=projected, cap=cap, cap_hit_on=hit_on)
 
 
 def days(start: datetime, end: datetime) -> list[date]:
