@@ -26,14 +26,22 @@ APP_PERMISSIONS = {
     "pull_requests": "write",
     "checks": "write",
     "issues": "write",
-    "members": "write",  # read who's an org owner; create the empty chakshu team during setup
+    "members": "write",  # list members and owners; create the empty chakshu team during setup
     "metadata": "read",
     "actions": "write",  # start the review workflow and hear when it ends
     "workflows": "write",  # propose .github/workflows/chakshu.yml
     "secrets": "write",  # keep the Claude credential in each repo's Actions secrets
 }
 # pull_request_review_comment: someone replied to one of Chakshu's review comments
-APP_EVENTS = ["pull_request", "issue_comment", "pull_request_review_comment", "push", "workflow_run"]
+# organization: members joining and leaving, for the People directory
+APP_EVENTS = [
+    "pull_request",
+    "issue_comment",
+    "pull_request_review_comment",
+    "push",
+    "workflow_run",
+    "organization",
+]
 
 
 def new_setup_code() -> str:

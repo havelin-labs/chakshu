@@ -33,7 +33,11 @@ class Key(StrEnum):
     MONTHLY_CAP_USD = "review.monthly_cap_usd"
     ACTIONS_ACTION = "actions.action"  # owner/repo@ref of the action the workflow runs
     ANALYTICS_SHOW_NAMES = "analytics.show_names"  # "true" or "false": name people in analytics
-    ANALYTICS_MIN_GROUP = "analytics.min_group"  # hide grouped numbers covering fewer people than this
+    ANALYTICS_MIN_GROUP = (
+        "analytics.min_group"  # hide grouped numbers covering fewer people than this; 1 is off
+    )
+    MEMBERS_SYNCED_AT = "members.synced_at"  # when the org member list last came from GitHub (ISO 8601)
+    MEMBERS_STALE = "members.stale"  # "true" when the last attempt failed and the list is older than it looks
 
 
 SECRET_KEYS = frozenset(

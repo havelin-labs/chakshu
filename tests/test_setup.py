@@ -55,6 +55,7 @@ def test_manifest_includes_webhooks_for_public_urls(monkeypatch):
         "pull_request_review_comment",
         "push",
         "workflow_run",
+        "organization",
     }
 
 
