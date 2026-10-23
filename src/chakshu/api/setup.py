@@ -6,10 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from githubkit.exception import RequestFailed
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 
 from chakshu.api.deps import CredentialsDep, csrf_protect, require_setup_or_admin
-from chakshu.db.models import Installation, Repo
 from chakshu.db.session import SessionDep
 from chakshu.helpers import mentions
 from chakshu.services import github, installations, orgs, setup
@@ -81,23 +79,4 @@ async def sync(creds: CredentialsDep, session: SessionDep) -> dict:
 @router.post("/team", dependencies=[Depends(require_setup_or_admin)])
 async def create_team(creds: CredentialsDep, session: SessionDep) -> dict:
     """Create the empty chakshu team in each organization, with read access to the installed repos."""
-    installs = (
-        await session.scalars(
-            select(Installation).where(
-                Installation.account_type == "Organization", Installation.suspended.is_(False)
-            )
-        )
-    ).all()
-    results: dict[str, str] = {}
-    for install in installs:
-        repos = (
-            await session.scalars(select(Repo.full_name).where(Repo.installation_id == install.id))
-        ).all()
-        try:
-            results[install.account_login] = await orgs.ensure_review_team(
-                creds, install.github_id, install.account_login, list(repos)
-            )
-        except RequestFailed as exc:
-            # 403 usually means the app or the installation lacks members: write.
-            results[install.account_login] = f"failed ({exc.response.status_code})"
-    return {"team": mentions.HANDLE_TEAM, "results": results}
+    return {"team": mentions.HANDLE_TEAM, "results": await orgs.ensure_review_teams(session, creds)}

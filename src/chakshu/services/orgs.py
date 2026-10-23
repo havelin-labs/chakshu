@@ -7,7 +7,10 @@ user's own token can see.
 from typing import Literal
 
 from githubkit.exception import RequestFailed
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from chakshu.db.models import Installation, Repo
 from chakshu.helpers import mentions
 from chakshu.services import github
 from chakshu.services.github import AppCredentials
@@ -68,3 +71,25 @@ async def ensure_review_team(
         notification_setting="notifications_disabled",
     )
     return "created"
+
+
+async def ensure_review_teams(session: AsyncSession, creds: AppCredentials) -> dict[str, str]:
+    """Run ensure_review_team for each installed organization: login -> created, exists or failed (status)."""
+    installs = (
+        await session.scalars(
+            select(Installation).where(
+                Installation.account_type == "Organization", Installation.suspended.is_(False)
+            )
+        )
+    ).all()
+    results: dict[str, str] = {}
+    for install in installs:
+        repos = await session.scalars(select(Repo.full_name).where(Repo.installation_id == install.id))
+        try:
+            results[install.account_login] = await ensure_review_team(
+                creds, install.github_id, install.account_login, sorted(repos.all())
+            )
+        except RequestFailed as exc:
+            # 403 usually means the app or the installation lacks members: write.
+            results[install.account_login] = f"failed ({exc.response.status_code})"
+    return results

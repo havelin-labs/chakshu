@@ -1,9 +1,15 @@
+import uuid
 from base64 import b64decode
+from typing import Any
 
+import httpx
+from githubkit import Response
+from githubkit.exception import RequestFailed
 from nacl import encoding, public
 
+from chakshu.db.models import Installation, Repo
 from chakshu.helpers import workflow
-from chakshu.services import actions_secrets, app_permissions, proposals, setup
+from chakshu.services import actions_secrets, app_permissions, orgs, proposals, setup
 from chakshu.services.repo_setup import ActionsStatus
 
 
@@ -54,3 +60,46 @@ def test_a_repo_is_ready_with_the_workflow_and_one_secret():
     assert ActionsStatus("outdated", None, {"A": True}).ready
     assert not ActionsStatus("missing", "https://pr", {"A": True}).ready
     assert not ActionsStatus("current", None, {"A": False}).ready
+
+
+async def test_review_teams_cover_each_installed_org(db, monkeypatch):
+    def add(github_id: int, login: str, account_type: str = "Organization", suspended: bool = False):
+        install = Installation(
+            id=uuid.uuid4(),
+            github_id=github_id,
+            account_github_id=github_id * 10,
+            account_login=login,
+            account_type=account_type,
+            suspended=suspended,
+        )
+        db.add(install)
+        return install
+
+    acme = add(1, "acme")
+    add(2, "globex")
+    add(3, "alice", account_type="User")
+    add(4, "initech", suspended=True)
+    await db.flush()
+    db.add_all(
+        [
+            Repo(id=uuid.uuid4(), github_id=11, installation_id=acme.id, full_name="acme/web"),
+            Repo(id=uuid.uuid4(), github_id=12, installation_id=acme.id, full_name="acme/api"),
+        ]
+    )
+    await db.commit()
+
+    calls = []
+
+    async def ensure(creds, installation_id, org, repo_names):
+        calls.append((installation_id, org, repo_names))
+        if org == "globex":
+            request = httpx.Request("POST", "https://api.github.com/orgs/globex/teams")
+            raise RequestFailed(Response(httpx.Response(403, request=request), Any))
+        return "created"
+
+    monkeypatch.setattr(orgs, "ensure_review_team", ensure)
+
+    results = await orgs.ensure_review_teams(db, creds=None)
+
+    assert results == {"acme": "created", "globex": "failed (403)"}
+    assert sorted(calls) == [(1, "acme", ["acme/api", "acme/web"]), (2, "globex", [])]
