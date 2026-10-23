@@ -25,10 +25,15 @@ class Published:
 async def _markers(client: GitHub, owner: str, repo: str, number: int) -> set[str]:
     comments = [
         c.body
-        async for c in client.rest.paginate(client.rest.pulls.async_list_review_comments, owner, repo, number)
+        async for c in client.rest.paginate(
+            client.rest.pulls.async_list_review_comments, owner=owner, repo=repo, pull_number=number
+        )
     ]
     reviews = [
-        r.body async for r in client.rest.paginate(client.rest.pulls.async_list_reviews, owner, repo, number)
+        r.body
+        async for r in client.rest.paginate(
+            client.rest.pulls.async_list_reviews, owner=owner, repo=repo, pull_number=number
+        )
     ]
     return f.existing_markers(comments + reviews)
 
