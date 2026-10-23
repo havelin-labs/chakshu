@@ -19,7 +19,7 @@ from pathlib import Path
 from chakshu import handlers
 from chakshu.db.models import Run, WebhookEvent
 from chakshu.db.session import get_sessionmaker
-from chakshu.services import dispatcher, events, github, members, pr_authors, queue, review_results
+from chakshu.services import alerts, dispatcher, events, github, members, pr_authors, queue, review_results
 
 log = logging.getLogger("chakshu.worker")
 
@@ -95,6 +95,7 @@ class Worker:
                         if time.monotonic() - last_members > members.SYNC_EVERY.total_seconds():
                             last_members = time.monotonic()
                             await members.sync(session, creds)
+                    await alerts.run(session)
                     if time.monotonic() - last_prune > PRUNE_EVERY:
                         await events.prune(session)
                         last_prune = time.monotonic()
