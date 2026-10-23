@@ -1,13 +1,18 @@
-"""Who belongs to which org and team, asked as the app installation.
+"""Who belongs to which org, asked as the app installation, and the org's chakshu team.
 
-Uses the app's "members: read" permission, so answers don't depend on what a
+Uses the app's "members" permission, so answers don't depend on what a
 user's own token can see.
 """
 
+from typing import Literal
+
 from githubkit.exception import RequestFailed
 
+from chakshu.helpers import mentions
 from chakshu.services import github
 from chakshu.services.github import AppCredentials
+
+TeamState = Literal["created", "exists"]
 
 
 async def org_role(creds: AppCredentials, installation_id: int, org: str, login: str) -> str | None:
@@ -37,3 +42,29 @@ async def repo_permission(creds: AppCredentials, installation_id: int, full_name
 
 def can_write(permission: str) -> bool:
     return permission in {"admin", "maintain", "write"}
+
+
+async def ensure_review_team(
+    creds: AppCredentials, installation_id: int, org: str, repo_names: list[str]
+) -> TeamState:
+    """Create the empty team people mention (@org/chakshu), with read access to these repos.
+
+    An existing team is left as it is: changing its repos would need the
+    administration permission, which Chakshu doesn't ask for.
+    """
+    client = github.installation_client(creds, installation_id)
+    try:
+        await client.rest.teams.async_get_by_name(org, mentions.HANDLE_TEAM)
+        return "exists"
+    except RequestFailed as exc:
+        if exc.response.status_code != 404:
+            raise
+    await client.rest.teams.async_create(
+        org,
+        name=mentions.HANDLE_TEAM,
+        description="Mention or request this team to ask Chakshu for a review. Keep it empty.",
+        repo_names=repo_names,
+        privacy="closed",  # visible to the whole org, so anyone can mention it
+        notification_setting="notifications_disabled",
+    )
+    return "created"

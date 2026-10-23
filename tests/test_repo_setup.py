@@ -3,7 +3,7 @@ from base64 import b64decode
 from nacl import encoding, public
 
 from chakshu.helpers import workflow
-from chakshu.services import actions_secrets, app_permissions, proposals
+from chakshu.services import actions_secrets, app_permissions, proposals, setup
 from chakshu.services.repo_setup import ActionsStatus
 
 
@@ -30,6 +30,11 @@ def test_missing_permissions_compare_levels():
     assert (
         app_permissions.missing({"contents": "admin", "actions": "write", "metadata": "read"}, required) == []
     )
+
+
+def test_apps_made_before_team_creation_are_told_to_upgrade_members():
+    granted = setup.APP_PERMISSIONS | {"members": "read"}
+    assert app_permissions.missing(granted) == ["members: write"]
 
 
 def test_missing_events():

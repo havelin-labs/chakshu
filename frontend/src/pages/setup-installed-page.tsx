@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 
 import { ErrorNotice } from "@/components/notice"
 import { PageHeader } from "@/components/page-header"
+import { ReviewTeam } from "@/components/review-team"
 import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useSession } from "@/hooks/use-session"
@@ -30,9 +31,10 @@ export function SetupInstalledPage() {
           {sync.data && (
             <>
               <p>
-                Found {sync.data.installations} installation{sync.data.installations === 1 ? "" : "s"}. Sign in with
-                the GitHub account that owns the organization to finish.
+                Found {sync.data.installations} installation{sync.data.installations === 1 ? "" : "s"}.
               </p>
+              <ReviewTeam />
+              <p>Sign in with the GitHub account that owns the organization to finish.</p>
               <div className="flex flex-wrap gap-3">
                 <a className={buttonVariants()} href="/auth/login">
                   Sign in with GitHub

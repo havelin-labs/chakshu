@@ -27,7 +27,7 @@ Then open `CHAKSHU_BASE_URL` in a browser:
 3. Install the app on the repos you want reviewed, plus your reviewers repo.
 4. Sign in with GitHub as an org owner and add an Anthropic API key or a Claude subscription token under **Settings**. Chakshu copies it into each repository's Actions secrets.
 5. Create `<org>/chakshu-reviewers` from the [reviewers template](https://github.com/havelin-labs/chakshu-reviewers-template) (or copy [`templates/chakshu-reviewers`](templates/chakshu-reviewers)), then press **Sync from GitHub** on the Reviewers page. New reviewers and edits can be made on that page too; each save opens a pull request in the reviewers repo.
-6. Create an empty team called `chakshu` in your organization, with read access to the repos.
+6. Press **Create the chakshu team** (on the page GitHub sends you back to after installing, or under **Settings**). It makes the empty `chakshu` team people mention, with read access to the installed repos. You can also create it by hand.
 7. On each repository's page in the portal, press **Set up GitHub Actions** and merge the pull request it opens. It adds `.github/workflows/chakshu.yml`, the workflow reviews run in.
 
 Comment `@<org>/chakshu` on a pull request, or press **Review** on its page in the portal.
