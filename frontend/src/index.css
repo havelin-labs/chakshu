@@ -81,7 +81,7 @@
     --border: rgba(204, 207, 209, 0.5);
     --input: rgba(204, 207, 209, 0.9);
     --ring: #00C7B0;
-    --chart-1: #00C7B0;
+    --chart-1: #008F7E; /* single-series chart marks: 3:1 against white, checked with the dataviz validator */
     --chart-2: #00806F;
     --chart-3: #5E6773;
     --chart-4: #7FE3D7;
@@ -120,7 +120,7 @@
     --border: rgba(255, 255, 255, 0.08);
     --input: rgba(255, 255, 255, 0.14);
     --ring: #00C7B0;
-    --chart-1: #00C7B0;
+    --chart-1: #00A08D; /* same job on the dark surface, inside the dark lightness band */
     --chart-2: #2EE0CA;
     --chart-3: #9AA3AE;
     --chart-4: #007A6C;

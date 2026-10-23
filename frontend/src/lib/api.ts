@@ -249,3 +249,63 @@ export type AppPermissions = {
 }
 
 export type SecretsSync = { synced: string[]; failed: Record<string, string> }
+export type AnalyticsRow = {
+  key: string
+  reviews: number
+  prs: number
+  engaged: number
+  spend: number
+  cost_per_review: number | null
+  posted: number
+  fixed: number
+  dismissed: number
+  open: number
+  fix_rate: number | null
+  dismissed_rate: number | null
+  cost_per_fixed: number | null
+  engaged_share: number | null
+}
+
+export type Tile = { value: number | null; previous: number | null; change: number | null }
+
+export type Overview = {
+  tiles: Record<
+    "reviews" | "prs" | "spend" | "posted" | "fixed" | "fix_rate" | "cost_per_fixed" | "engaged_share" | "requesters",
+    Tile
+  >
+  daily: { day: string; reviews: number; spend: number; posted: number; fixed: number }[]
+}
+
+export type PersonRow = {
+  login: string
+  name: string | null
+  requested: number
+  prs_reviewed: number
+  auto_reviews: number
+  engaged: boolean
+  cost_triggered: number
+}
+
+export type PeopleResult = { hidden: "names_off" | "small_group" | null; min_group: number; rows: PersonRow[] }
+
+export type CostView = {
+  forecast: { month_to_date: number; projected: number; cap: number | null; cap_hit_on: string | null }
+  stopped_by_review_cap: number
+  by: Record<"repo" | "reviewer" | "model" | "trigger", AnalyticsRow[]>
+}
+
+export type FindingRow = {
+  posted_at: string
+  repo: string
+  pr_number: number
+  pr_title: string | null
+  review_url: string | null
+  reviewer: string
+  skill: string | null
+  severity: string
+  category: string
+  outcome: "open" | "fixed" | "dismissed"
+  outcome_source: "code_change" | "thread_resolved" | "reply" | null
+}
+
+export type AnalyticsPrivacy = { show_names: boolean; min_group: number }

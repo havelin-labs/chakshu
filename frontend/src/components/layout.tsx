@@ -10,6 +10,8 @@ const NAV: { to: string; label: string; admin?: boolean }[] = [
   { to: "/repos", label: "Repositories" },
   { to: "/reviewers", label: "Reviewers" },
   { to: "/insights", label: "Insights" },
+  { to: "/analytics", label: "Analytics", admin: true },
+  { to: "/me", label: "My activity" },
   { to: "/settings", label: "Settings", admin: true },
   { to: "/status", label: "Status" },
 ]
