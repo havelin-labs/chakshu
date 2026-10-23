@@ -17,6 +17,7 @@ from githubkit import GitHub
 from githubkit.exception import RequestFailed
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from chakshu.connectors import bridge
 from chakshu.db.models import Installation, Repo, Reviewer, Run, RunStatus
 from chakshu.db.session import get_sessionmaker
 from chakshu.helpers import findings
@@ -113,9 +114,14 @@ async def _execute(
         raise RuntimeError("The reviewers repo is no longer visible to the app.")
     model, max_usd, auth_env = await _review_settings(session, reviewer)
     run.model = model
-    toolsets = await connectors.toolsets_for(
+    specs = await connectors.tools_for(
         session, reviewer.connectors, "\n".join([pr.title, pr.head.ref, pr.body or ""])
     )
+
+    async def call_tool(name: str, tool: str, args: dict) -> str:
+        return await connectors.call(session, reviewer.connectors, name, tool, args)
+
+    toolsets = [bridge.toolset(spec, call_tool) for spec in specs]
 
     await queue.set_progress(session, run, "Preparing workspace")
     token = await github.installation_token(creds, installation.github_id)

@@ -15,7 +15,7 @@ from typing import Any
 
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
-from chakshu.connectors import Toolset
+from chakshu.connectors.bridge import Toolset
 from chakshu.helpers.prompt import FINDINGS_SCHEMA, SYSTEM_PROMPT
 
 log = logging.getLogger(__name__)

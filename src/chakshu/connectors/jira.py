@@ -1,11 +1,11 @@
 """Jira: let the reviewer read the issues a pull request refers to."""
 
 import re
+from typing import Any
 
 import httpx
-from claude_agent_sdk import create_sdk_mcp_server, tool
 
-from chakshu.connectors import ConnectorConfig, Kind, Toolset
+from chakshu.connectors import ConnectorConfig, Kind, ToolError, ToolSpec
 from chakshu.helpers.prompt import fence
 
 KEY_RE = re.compile(r"\b([A-Z][A-Z0-9_]{1,9}-\d{1,7})\b")
@@ -13,6 +13,17 @@ FIELDS = "summary,description,status,issuetype,priority,labels,parent"
 MAX_KEYS = 10
 MAX_TEXT = 8_000
 TIMEOUT = 15.0
+
+GET_ISSUE = ToolSpec(
+    name="get_issue",
+    description="Read a Jira issue by its key, e.g. PAY-412: summary, type, status, priority, labels, "
+    "parent and description.",
+    input_schema={
+        "type": "object",
+        "properties": {"key": {"type": "string", "description": "Issue key, e.g. PAY-412"}},
+        "required": ["key"],
+    },
+)
 
 
 def issue_keys(text: str) -> list[str]:
@@ -60,6 +71,32 @@ async def fetch_issue(config: ConnectorConfig, key: str) -> str:
     return format_issue(key, resp.json())
 
 
+async def call(config: ConnectorConfig, tool: str, args: dict[str, Any]) -> str:
+    if tool != GET_ISSUE.name:
+        raise ToolError(f"Unknown tool '{tool}'.")
+    key = str(args.get("key", "")).strip().upper()
+    if not KEY_RE.fullmatch(key):
+        raise ToolError(f"'{key}' isn't a Jira issue key.")
+    try:
+        text = await fetch_issue(config, key)
+    except httpx.HTTPError as exc:
+        raise ToolError(f"Couldn't read {key}: {exc}") from exc
+    return fence(f"jira issue {key}", text)
+
+
+def hint(name: str, pr_text: str) -> str:
+    keys = issue_keys(pr_text)
+    referenced = (
+        f"The pull request refers to {', '.join(keys)}."
+        if keys
+        else "The pull request doesn't name an issue, so only look one up if the code or comments do."
+    )
+    return (
+        f"Jira is available through the `{name}` get_issue tool. {referenced} "
+        "Read the issue and check the change does what it asks; report gaps as findings."
+    )
+
+
 async def check(config: ConnectorConfig) -> str:
     async with _client(config) as client:
         resp = await client.get("/rest/api/2/myself")
@@ -67,41 +104,4 @@ async def check(config: ConnectorConfig) -> str:
     return f"Connected as {resp.json().get('displayName') or config.username}"
 
 
-def build(config: ConnectorConfig, pr_text: str) -> Toolset:
-    @tool(
-        "get_issue",
-        "Read a Jira issue by its key, e.g. PAY-412: summary, type, status, priority, labels, "
-        "parent and description.",
-        {"key": str},
-    )
-    async def get_issue(args: dict) -> dict:
-        key = str(args.get("key", "")).strip().upper()
-        if not KEY_RE.fullmatch(key):
-            return {
-                "content": [{"type": "text", "text": f"'{key}' isn't a Jira issue key."}],
-                "is_error": True,
-            }
-        try:
-            text = await fetch_issue(config, key)
-        except httpx.HTTPError as exc:
-            return {"content": [{"type": "text", "text": f"Couldn't read {key}: {exc}"}], "is_error": True}
-        return {"content": [{"type": "text", "text": fence(f"jira issue {key}", text)}]}
-
-    keys = issue_keys(pr_text)
-    referenced = (
-        f"The pull request refers to {', '.join(keys)}."
-        if keys
-        else "The pull request doesn't name an issue, so only look one up if the code or comments do."
-    )
-    return Toolset(
-        server_name=config.name,
-        server=create_sdk_mcp_server(name=config.name, version="1.0.0", tools=[get_issue]),
-        tool_names=[f"mcp__{config.name}__get_issue"],
-        prompt_hint=(
-            f"Jira is available through the `{config.name}` get_issue tool. {referenced} "
-            "Read the issue and check the change does what it asks; report gaps as findings."
-        ),
-    )
-
-
-KIND = Kind(label="Jira", build=build, check=check)
+KIND = Kind(label="Jira", tools=(GET_ISSUE,), call=call, hint=hint, check=check)
