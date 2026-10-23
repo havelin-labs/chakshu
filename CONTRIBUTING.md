@@ -42,6 +42,6 @@ If you find yourself writing the same thing twice, it probably belongs in `helpe
 
 - `ruff check . && ruff format .`
 - `pytest`
-- `cd frontend && npm run lint && npm run build`
+- `cd frontend && npm run lint && npm test && npm run build`
 - Write commit messages in the imperative ("Add webhook retry", not "Added..."), with a body that says why when it isn't obvious.
 - Keep pull requests to one concern. Smaller ones get reviewed faster.

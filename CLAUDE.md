@@ -8,7 +8,7 @@ Notes for anyone (person or coding agent) changing this repository. CONTRIBUTING
 - Commit messages: `type: short summary` (feat, fix, refactor, test, docs, ci, chore), lowercase, imperative, no scope, with a body that says why when it isn't obvious. Split unrelated changes into separate commits.
 - PR descriptions, README and docs are plain prose: no em dashes, no filler, no promotional tone. End the PR body with `Closes #N`.
 - No AI attribution anywhere: no Co-Authored-By trailers and no "Generated with" lines in commits, PRs, issues or docs.
-- Before pushing: `ruff check .`, `ruff format --check .`, `pytest -q` (needs Postgres), and in `frontend/` `npm run lint` and `npx tsc -b`. Merge with `gh pr merge --rebase --delete-branch` only after CI is green.
+- Before pushing: `ruff check .`, `ruff format --check .`, `pytest -q` (needs Postgres), and in `frontend/` `npm run lint`, `npm test` and `npx tsc -b`. Merge with `gh pr merge --rebase --delete-branch` only after CI is green.
 - When a PR merges, comment on its issue with what changed, any new app permissions, events or migrations, and how to test it by hand. End-to-end testing against a real GitHub org is done by the maintainers, not in CI.
 
 ## Architecture
