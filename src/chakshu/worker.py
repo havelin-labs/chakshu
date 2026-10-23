@@ -19,7 +19,7 @@ from pathlib import Path
 from chakshu import handlers
 from chakshu.db.models import Run, WebhookEvent
 from chakshu.db.session import get_sessionmaker
-from chakshu.services import dispatcher, events, queue, review_results
+from chakshu.services import dispatcher, events, github, pr_authors, queue, review_results
 
 log = logging.getLogger("chakshu.worker")
 
@@ -89,6 +89,8 @@ class Worker:
                         log.warning("Requeued %s job(s) from a worker that stopped", requeued)
                     if expired := await review_results.expire_dispatched(session):
                         log.warning("Gave up on %s run(s) that GitHub Actions never finished", expired)
+                    if creds := await github.load_credentials(session):
+                        await pr_authors.backfill(session, creds)
                     if time.monotonic() - last_prune > PRUNE_EVERY:
                         await events.prune(session)
                         last_prune = time.monotonic()

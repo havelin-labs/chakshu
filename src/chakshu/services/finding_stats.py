@@ -10,7 +10,7 @@ from sqlalchemy import case, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from chakshu.db.models import FindingOutcome, Installation, PostedFinding, Reviewer, Run
+from chakshu.db.models import FindingOutcome, Installation, OutcomeSource, PostedFinding, Reviewer, Run
 from chakshu.helpers.findings import Identified
 from chakshu.services import threads
 
@@ -36,9 +36,17 @@ async def record_posted(session: AsyncSession, run: Run, items: Iterable[Identif
         )
 
 
-async def record_outcomes(session: AsyncSession, fixed: set[str], dismissed: set[str]) -> None:
-    """Close open findings. An outcome, once recorded, isn't changed by later scans."""
+async def record_outcomes(
+    session: AsyncSession, fixed: set[str], dismissed: set[str], source: OutcomeSource | None = None
+) -> None:
+    """Close open findings. An outcome, once recorded, isn't changed by later scans.
+
+    Without a source, fixed means the code changed and dismissed means the thread was resolved.
+    """
     for outcome, ids in ((FindingOutcome.FIXED, fixed), (FindingOutcome.DISMISSED, dismissed)):
+        how = source or (
+            OutcomeSource.CODE_CHANGE if outcome == FindingOutcome.FIXED else OutcomeSource.THREAD_RESOLVED
+        )
         if ids:
             await session.execute(
                 update(PostedFinding)
@@ -46,7 +54,7 @@ async def record_outcomes(session: AsyncSession, fixed: set[str], dismissed: set
                     PostedFinding.id.in_([uuid.UUID(i) for i in ids]),
                     PostedFinding.outcome == FindingOutcome.OPEN.value,
                 )
-                .values(outcome=outcome.value, closed_at=datetime.now(UTC))
+                .values(outcome=outcome.value, outcome_source=how.value, closed_at=datetime.now(UTC))
             )
 
 

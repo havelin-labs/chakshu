@@ -150,8 +150,13 @@ class Run(Base, JobMixin, TimestampMixin):
     actions_run_url: Mapped[str | None] = mapped_column(String(500))
     # Set for reply runs: the first comment of the Chakshu thread someone answered. The reply goes there.
     reply_to: Mapped[int | None] = mapped_column(BigInteger)
+    # Who opened the pull request, for usage views. Filled from the PR when the run is queued.
+    pr_author: Mapped[str | None] = mapped_column(String(100), index=True)
 
-    __table_args__ = (Index("ix_runs_status_created_at", "status", "created_at"),)
+    __table_args__ = (
+        Index("ix_runs_status_created_at", "status", "created_at"),
+        Index("ix_runs_created_at_repo_id", "created_at", "repo_id"),
+    )
 
 
 class Connector(Base, TimestampMixin):
@@ -174,6 +179,14 @@ class FindingOutcome(StrEnum):
     DISMISSED = "dismissed"
 
 
+class OutcomeSource(StrEnum):
+    """How an outcome was decided, so the portal can say what a fix rate is based on."""
+
+    CODE_CHANGE = "code_change"  # the code under Chakshu's comment changed
+    THREAD_RESOLVED = "thread_resolved"  # someone resolved the thread without changing the code
+    REPLY = "reply"  # the reviewer judged it while answering a reply
+
+
 class PostedFinding(Base, TimestampMixin):
     """An inline finding Chakshu posted, and what became of it. Feeds the per-skill stats."""
 
@@ -186,7 +199,21 @@ class PostedFinding(Base, TimestampMixin):
     severity: Mapped[str] = mapped_column(String(20))
     category: Mapped[str] = mapped_column(String(30))
     outcome: Mapped[FindingOutcome] = mapped_column(String(20), default=FindingOutcome.OPEN)
+    outcome_source: Mapped[OutcomeSource | None] = mapped_column(String(20))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AnalyticsAudit(Base):
+    """Who looked at or exported analytics about named people. Kept for the org's own records."""
+
+    __tablename__ = "analytics_audit"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    user_login: Mapped[str] = mapped_column(String(100))
+    action: Mapped[str] = mapped_column(String(20))  # view | export
+    view: Mapped[str] = mapped_column(String(50))
+    filters: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class WebhookEvent(Base, JobMixin, TimestampMixin):
