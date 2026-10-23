@@ -74,7 +74,10 @@ export type Reviewer = {
   errors: string[]
 }
 
-export type RunStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled"
+export type RunStatus = "queued" | "running" | "dispatched" | "succeeded" | "failed" | "cancelled"
+
+// Still on its way to a result: queued here, being dispatched, or running in GitHub Actions.
+export const isLive = (status: RunStatus) => status === "queued" || status === "running" || status === "dispatched"
 
 export type Run = {
   id: string
@@ -93,6 +96,7 @@ export type Run = {
   cost_usd: number | null
   duration_ms: number | null
   review_url: string | null
+  actions_run_url: string | null
   created_at: string
   finished_at: string | null
 }

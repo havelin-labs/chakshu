@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/status-badge"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { apiGet, type Finding, type RunDetail } from "@/lib/api"
+import { apiGet, isLive, type Finding, type RunDetail } from "@/lib/api"
 import { cost, duration, shortSha, timeAgo } from "@/lib/format"
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -46,10 +46,7 @@ export function RunPage() {
   const run = useQuery({
     queryKey: ["run", id],
     queryFn: () => apiGet<RunDetail>(`/api/runs/${id}`),
-    refetchInterval: (query) => {
-      const status = query.state.data?.status
-      return status === "queued" || status === "running" ? 3_000 : false
-    },
+    refetchInterval: (query) => (query.state.data && isLive(query.state.data.status) ? 3_000 : false),
   })
   const data = run.data
 
@@ -66,6 +63,11 @@ export function RunPage() {
                 <a className={buttonVariants({ variant: "outline" })} href={data.pr_url} target="_blank" rel="noreferrer">
                   Pull request
                 </a>
+                {data.actions_run_url && (
+                  <a className={buttonVariants({ variant: "outline" })} href={data.actions_run_url} target="_blank" rel="noreferrer">
+                    Actions logs
+                  </a>
+                )}
                 {data.review_url && (
                   <a className={buttonVariants()} href={data.review_url} target="_blank" rel="noreferrer">
                     Open review
