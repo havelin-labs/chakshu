@@ -36,7 +36,7 @@ def new_setup_code() -> str:
     return f"{raw[:4]}-{raw[4:]}"
 
 
-def _normalize(code: str) -> str:
+def normalize_code(code: str) -> str:
     return code.strip().upper().replace(" ", "").replace("-", "")
 
 
@@ -54,7 +54,7 @@ async def ensure_setup_code(session: AsyncSession) -> str | None:
 
 async def check_setup_code(session: AsyncSession, submitted: str) -> bool:
     expected = await store.get(session, Key.SETUP_CODE)
-    return bool(expected) and hmac.compare_digest(_normalize(submitted), _normalize(expected))
+    return bool(expected) and hmac.compare_digest(normalize_code(submitted), normalize_code(expected))
 
 
 def webhooks_reachable() -> bool:

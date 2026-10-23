@@ -31,6 +31,8 @@ async def _ensure_not_configured(session: SessionDep) -> None:
 
 @router.post("/claim", dependencies=[Depends(_ensure_not_configured)])
 async def claim(body: ClaimRequest, request: Request, session: SessionDep) -> dict:
+    if len(setup.normalize_code(body.code)) != 8:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid setup code.")
     if not await setup.check_setup_code(session, body.code):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "That setup code doesn't match. Check the web logs.")
     request.session["setup"] = True
