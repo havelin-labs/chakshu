@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chakshu.db.models import Run, RunStatus
-from chakshu.helpers import findings
+from chakshu.helpers import findings, mentions
 from chakshu.runner.protocol import Result
 from chakshu.services import checks, finding_stats, jobs, publisher, replies, runs, triggers
 from chakshu.services.jobs import RunContext
@@ -107,7 +107,11 @@ async def complete(session: AsyncSession, ctx: RunContext, result: Result) -> No
         )
     if run.trigger == "review_requested":
         await triggers.clear_team_request(
-            ctx.creds, ctx.installation.github_id, repo.full_name, run.pr_number
+            ctx.creds,
+            ctx.installation.github_id,
+            repo.full_name,
+            run.pr_number,
+            teams=[mentions.reviewer_team(reviewer.name)],
         )
 
     run.result = {

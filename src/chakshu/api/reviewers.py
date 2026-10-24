@@ -10,6 +10,7 @@ from chakshu.api.deps import AdminDep, CredentialsDep, UserDep, csrf_protect
 from chakshu.core.config import get_settings
 from chakshu.db.models import Installation, Reviewer
 from chakshu.db.session import SessionDep
+from chakshu.helpers import mentions
 from chakshu.helpers.catalog import AutoEvent
 from chakshu.helpers.reviewer_drafts import ReviewerDraft
 from chakshu.services import catalog, connectors, reviewer_editor
@@ -33,6 +34,8 @@ def _serialize(reviewer: Reviewer, installation: Installation, repo_name: str | 
         "product": reviewer.product,
         "description": reviewer.description,
         "owner_team": reviewer.owner_team,
+        # Request this team in a pull request's Reviewers box to run just this reviewer.
+        "team": f"{installation.account_login}/{mentions.reviewer_team(reviewer.name)}",
         "model": reviewer.model,
         "repos": reviewer.repos,
         "paths": reviewer.paths,

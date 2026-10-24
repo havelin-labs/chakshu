@@ -5,8 +5,10 @@ chakshu team, an automatic PR event, or the portal's Review button.
 """
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
+from githubkit.exception import RequestFailed
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -124,11 +126,15 @@ async def reply(creds: AppCredentials, req: ReviewRequest, body: str) -> None:
 
 
 async def clear_team_request(
-    creds: AppCredentials, installation_id: int, full_name: str, number: int
+    creds: AppCredentials, installation_id: int, full_name: str, number: int, teams: Sequence[str] = ()
 ) -> None:
-    """Remove the pending chakshu team request so the PR doesn't wait on it."""
+    """Remove pending requests for chakshu and any reviewer teams, so the PR doesn't wait on them."""
     owner, name = full_name.split("/", 1)
     client = github.installation_client(creds, installation_id)
-    await client.rest.pulls.async_remove_requested_reviewers(
-        owner, name, number, reviewers=[], team_reviewers=[mentions.HANDLE_TEAM]
-    )
+    for team in dict.fromkeys([mentions.HANDLE_TEAM, *teams]):
+        try:
+            await client.rest.pulls.async_remove_requested_reviewers(
+                owner, name, number, reviewers=[], team_reviewers=[team]
+            )
+        except RequestFailed:
+            log.info("Couldn't clear the %s team request on %s#%s", team, full_name, number, exc_info=True)

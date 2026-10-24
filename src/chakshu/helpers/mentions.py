@@ -4,6 +4,22 @@ import re
 
 # The empty org team people mention or request: @<org>/chakshu.
 HANDLE_TEAM = "chakshu"
+# Each reviewer also gets a child team, chakshu-<name>, so it can be picked in a PR's Reviewers box.
+REVIEWER_TEAM_PREFIX = f"{HANDLE_TEAM}-"
+# In the description of every reviewer team Chakshu creates, so it only ever removes its own.
+TEAM_MARKER = "Managed by Chakshu."
+
+
+def reviewer_team(name: str) -> str:
+    """The team slug for a reviewer. Reviewer names are already valid slugs."""
+    return f"{REVIEWER_TEAM_PREFIX}{name}"
+
+
+def reviewer_from_team(slug: str | None) -> str | None:
+    """The reviewer a requested team stands for, or None for any other team."""
+    if not slug or not slug.startswith(REVIEWER_TEAM_PREFIX):
+        return None
+    return slug[len(REVIEWER_TEAM_PREFIX) :] or None
 
 
 def handle(org: str) -> str:
