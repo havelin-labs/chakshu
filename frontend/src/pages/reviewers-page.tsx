@@ -42,6 +42,13 @@ function ReviewerCard({ reviewer }: { reviewer: Reviewer }) {
           </div>
         </div>
         {reviewer.description && <p className="text-sm">{reviewer.description}</p>}
+        {reviewer.errors.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            Request <code className="font-mono text-foreground">{reviewer.team}</code> in a pull request's Reviewers box,
+            or comment <code className="font-mono text-foreground">@{reviewer.account}/chakshu {reviewer.name}</code>, to run
+            just this reviewer.
+          </p>
+        )}
         <Chips label="Repos" items={reviewer.repos} />
         <Chips label="Paths" items={reviewer.paths} />
         <Chips label="Skills" items={reviewer.skills} />
