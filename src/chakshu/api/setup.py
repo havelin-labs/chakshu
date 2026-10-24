@@ -1,6 +1,7 @@
 """Setup endpoints: claim the instance, create the GitHub App, sync installations."""
 
 import secrets
+from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
@@ -78,5 +79,12 @@ async def sync(creds: CredentialsDep, session: SessionDep) -> dict:
 
 @router.post("/team", dependencies=[Depends(require_setup_or_admin)])
 async def create_team(creds: CredentialsDep, session: SessionDep) -> dict:
-    """Create the empty chakshu team in each organization, with read access to the installed repos."""
-    return {"team": mentions.HANDLE_TEAM, "results": await orgs.ensure_review_teams(session, creds)}
+    """Create the empty chakshu team in each organization, with read access to the installed repos,
+    and a child team per reviewer so each can be picked in a pull request's Reviewers box."""
+    results = await orgs.ensure_review_teams(session, creds)
+    reviewer_teams = await orgs.sync_all_reviewer_teams(session, creds)
+    return {
+        "team": mentions.HANDLE_TEAM,
+        "results": results,
+        "reviewer_teams": {org: asdict(r) for org, r in reviewer_teams.items()},
+    }

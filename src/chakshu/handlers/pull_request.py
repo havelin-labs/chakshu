@@ -1,4 +1,5 @@
-"""Pull request events: review requests for the chakshu team, automatic runs, closing, and review speed."""
+"""Pull request events: review requests (the chakshu team or a reviewer's own team), automatic runs,
+closing, and review speed."""
 
 from chakshu.handlers.context import Context, Payload, installation_for, resolve
 from chakshu.helpers import mentions
@@ -36,14 +37,18 @@ async def handle(ctx: Context, payload: Payload) -> None:
     pr = payload.get("pull_request") or {}
     await record_speed(ctx, payload)
     requested_team = (payload.get("requested_team") or {}).get("slug")
+    named = mentions.reviewer_from_team(requested_team)
 
     if action == "closed":
         await _closed(ctx, payload)
         return
     if action == "review_requested" and requested_team == mentions.HANDLE_TEAM:
-        trigger, requester, event = "review_requested", payload["sender"]["login"], None
+        trigger, requester, event, reviewers = "review_requested", payload["sender"]["login"], None, None
+    elif action == "review_requested" and named:
+        # A reviewer's own team (chakshu-<name>): run just that reviewer.
+        trigger, requester, event, reviewers = "review_requested", payload["sender"]["login"], None, [named]
     elif action in AUTO_ACTIONS and not pr.get("draft"):
-        trigger, requester, event = "auto", None, action
+        trigger, requester, event, reviewers = "auto", None, action, None
     else:
         return
 
@@ -59,10 +64,11 @@ async def handle(ctx: Context, payload: Payload) -> None:
         source_id=ctx.delivery_id,
         requester=requester,
         event=event,
+        reviewers=reviewers,
     )
     outcome = await triggers.request_review(ctx.session, ctx.creds, request)
     if outcome.refused and requester:
         await triggers.reply(ctx.creds, request, outcome.refused)
         await triggers.clear_team_request(
-            ctx.creds, installation.github_id, repo.full_name, request.pr_number
+            ctx.creds, installation.github_id, repo.full_name, request.pr_number, teams=[requested_team or ""]
         )

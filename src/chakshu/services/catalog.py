@@ -15,7 +15,7 @@ from chakshu.db.models import Installation, Repo, Reviewer
 from chakshu.db.upsert import upsert
 from chakshu.helpers import git
 from chakshu.helpers.catalog import ParsedReviewer, load_catalog
-from chakshu.services import github
+from chakshu.services import github, orgs
 from chakshu.services import settings_store as store
 from chakshu.services.github import AppCredentials
 from chakshu.services.settings_store import Key
@@ -102,6 +102,20 @@ async def sync_installation(
             Reviewer.name.not_in([r["name"] for r in rows] or [""]),
         )
     )
+    await session.flush()
+    # Reviewer teams follow the catalog, but a GitHub hiccup there mustn't fail the sync.
+    try:
+        teams = await orgs.sync_reviewer_teams(session, creds, installation)
+    except Exception:
+        log.warning("Couldn't sync reviewer teams for %s", installation.account_login, exc_info=True)
+        teams = orgs.ReviewerTeams()
+    if teams.created or teams.removed:
+        log.info(
+            "Reviewer teams in %s: created %s, removed %s",
+            installation.account_login,
+            teams.created,
+            teams.removed,
+        )
     result.sha = sha
     result.reviewers = len(rows)
     result.broken = sum(1 for p in parsed if p.errors)

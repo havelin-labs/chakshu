@@ -27,10 +27,10 @@ Then open `CHAKSHU_BASE_URL` in a browser:
 3. Install the app on the repos you want reviewed, plus your reviewers repo.
 4. Sign in with GitHub as an org owner and add an Anthropic API key or a Claude subscription token under **Settings**. Chakshu copies it into each repository's Actions secrets.
 5. Create `<org>/chakshu-reviewers` from the [reviewers template](https://github.com/havelin-labs/chakshu-reviewers-template) (or copy [`templates/chakshu-reviewers`](templates/chakshu-reviewers)), then press **Sync from GitHub** on the Reviewers page. New reviewers and edits can be made on that page too; each save opens a pull request in the reviewers repo.
-6. Press **Create the chakshu team** (on the page GitHub sends you back to after installing, or under **Settings**). It makes the empty `chakshu` team people mention, with read access to the installed repos. You can also create it by hand.
+6. Press **Create the chakshu teams** (on the page GitHub sends you back to after installing, or under **Settings**). It makes the empty `chakshu` team people mention, with read access to the installed repos, and a team under it for each reviewer, like `chakshu-security`, so each reviewer can be picked in a pull request's Reviewers box. Reviewer teams follow the reviewers repo on every sync. You can also create the `chakshu` team by hand.
 7. On each repository's page in the portal, press **Set up GitHub Actions** and merge the pull request it opens. It adds `.github/workflows/chakshu.yml`, the workflow reviews run in.
 
-Comment `@<org>/chakshu` on a pull request, or press **Review** on its page in the portal.
+Comment `@<org>/chakshu` on a pull request, request the `chakshu` team as a reviewer, or press **Review** on its page in the portal. All three run every reviewer that covers the changed files. To run one reviewer, request its own team (`chakshu-security`) or name it: `@<org>/chakshu security`.
 
 Reply to one of Chakshu's inline comments and the reviewer that posted it answers in the thread, in a short Actions run of the same workflow. If the reply shows the finding is fixed or wrong, it resolves the thread, and the finding counts as fixed or dismissed in the stats. The pull request's author and anyone with write access get answers, up to five per thread. A GitHub App created before replies were added needs the **Pull request review comment** event turned on; Settings shows when it's missing.
 
