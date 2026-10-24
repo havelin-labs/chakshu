@@ -69,6 +69,9 @@ async def handle(ctx: Context, payload: Payload) -> None:
     outcome = await triggers.request_review(ctx.session, ctx.creds, request)
     if outcome.refused and requester:
         await triggers.reply(ctx.creds, request, outcome.refused)
+    if requester and not outcome.queued:
+        # Nothing new will run (refused, or already reviewed at this commit), so nothing would clear
+        # the request later. Clear it now so the PR doesn't wait on it.
         await triggers.clear_team_request(
             ctx.creds, installation.github_id, repo.full_name, request.pr_number, teams=[requested_team or ""]
         )
