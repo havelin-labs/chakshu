@@ -9,6 +9,7 @@ Logins are matched case-insensitively and shown as GitHub spells them.
 See helpers/analytics.py for the definitions of each rate.
 """
 
+import json
 import uuid
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, date, datetime, timedelta
@@ -122,6 +123,9 @@ def _findings(stmt: Select, f: Filters) -> Select:
 _review = (Run.status == RunStatus.SUCCEEDED.value) & (Run.trigger != REPLY)
 
 
+TOKENS = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens")
+
+
 def _run_columns():
     return (
         func.count(case((_review, 1))).label("reviews"),
@@ -133,6 +137,7 @@ def _run_columns():
         func.count(case((Run.status == RunStatus.FAILED.value, 1))).label("failed"),
         func.coalesce(func.sum(Run.cost_usd), 0).label("spend"),
         func.count(distinct(Run.requested_by)).label("requesters"),
+        *(func.coalesce(func.sum(getattr(Run, name)), 0).label(name) for name in TOKENS),
     )
 
 
@@ -164,7 +169,8 @@ COUNTS = (
 
 def _derive(row: dict) -> dict:
     """Add the rates and unit costs to a row of raw counts. Counts a row lacks are zero."""
-    row = dict.fromkeys(COUNTS, 0) | row
+    row = dict.fromkeys(COUNTS, 0) | dict.fromkeys(TOKENS, 0) | row
+    row |= {name: int(row[name] or 0) for name in TOKENS}  # Postgres sums bigints as numeric
     fixed, dismissed = row.get("fixed", 0), row.get("dismissed", 0)
     spent = float(row.get("spend") or 0)
     return row | {
@@ -729,3 +735,46 @@ async def audit_log(session: AsyncSession, limit: int = 200) -> list[dict]:
         }
         for row in rows
     ]
+
+
+async def fixed_by_severity(session: AsyncSession, f: Filters) -> dict[str, int]:
+    """Findings fixed in the period (by when they were fixed), most severe first."""
+    stmt = (
+        select(PostedFinding.severity, func.count())
+        .join(Run, PostedFinding.run_id == Run.id)
+        .where(
+            PostedFinding.outcome == FindingOutcome.FIXED.value,
+            PostedFinding.closed_at >= f.start,
+            PostedFinding.closed_at < f.end,
+        )
+        .group_by(PostedFinding.severity)
+    )
+    if f.repo_id:
+        stmt = stmt.where(Run.repo_id == f.repo_id)
+    if f.reviewer:
+        stmt = stmt.where(
+            PostedFinding.reviewer_id.in_(select(Reviewer.id).where(Reviewer.name == f.reviewer))
+        )
+    if f.trigger:
+        stmt = stmt.where(Run.trigger == f.trigger)
+    counts = dict((await session.execute(stmt)).all())
+    order = list(calc.DEFAULT_ROI_MINUTES)
+    return dict(sorted(counts.items(), key=lambda kv: order.index(kv[0]) if kv[0] in order else len(order)))
+
+
+async def roi_settings(session: AsyncSession) -> dict:
+    raw = json.loads(await store.get(session, Key.ANALYTICS_ROI) or "{}")
+    return {
+        "minutes": calc.DEFAULT_ROI_MINUTES | {k: float(v) for k, v in (raw.get("minutes") or {}).items()},
+        "hourly_rate": float(raw["hourly_rate"]) if raw.get("hourly_rate") else None,
+    }
+
+
+async def roi(session: AsyncSession, f: Filters) -> dict:
+    """The estimate panel: measured fixes and spend, valued with the admin's own assumptions."""
+    assumptions = await roi_settings(session)
+    fixed = await fixed_by_severity(session, f)
+    spent = (await totals(session, f))["spend"]
+    rate = assumptions["hourly_rate"]
+    estimate = calc.roi(fixed, assumptions["minutes"], rate or 0, spent) if rate else None
+    return {"assumptions": assumptions, "fixed_by_severity": fixed, "spend": spent, "estimate": estimate}

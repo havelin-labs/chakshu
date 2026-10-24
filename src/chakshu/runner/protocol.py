@@ -46,6 +46,15 @@ class ToolReply(BaseModel):
     is_error: bool = False
 
 
+class Usage(BaseModel):
+    """Tokens the agent used, as the SDK reports them. Cache reads and writes are billed differently."""
+
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+
+
 class Result(BaseModel):
     summary: str
     findings: list[dict[str, Any]] = Field(default_factory=list)
@@ -53,6 +62,7 @@ class Result(BaseModel):
     duration_ms: int | None = None
     turns: int | None = None
     outcome: Literal["open", "fixed", "dismissed"] | None = None  # reply jobs only
+    usage: Usage | None = None  # older runners don't send it
 
 
 class Failure(BaseModel):

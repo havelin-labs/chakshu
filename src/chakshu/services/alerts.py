@@ -11,11 +11,9 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 import httpx
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chakshu.core.config import get_settings
-from chakshu.db.models import FindingOutcome, PostedFinding
 from chakshu.helpers import alerts as text
 from chakshu.helpers import analytics as calc
 from chakshu.services import analytics, spend
@@ -81,19 +79,7 @@ async def _spend_alerts(
 async def digest_data(session: AsyncSession) -> dict:
     week = Filters.last(7)
     totals = await analytics.totals(session, week)
-    fixed_rows = (
-        await session.execute(
-            select(PostedFinding.severity, func.count())
-            .where(
-                PostedFinding.outcome == FindingOutcome.FIXED.value,
-                PostedFinding.closed_at >= week.start,
-                PostedFinding.closed_at < week.end,
-            )
-            .group_by(PostedFinding.severity)
-        )
-    ).all()
-    order = {s: i for i, s in enumerate(("critical", "high", "medium", "low", "info"))}
-    fixed_by_severity = dict(sorted(((s, n) for s, n in fixed_rows), key=lambda kv: order.get(kv[0], 9)))
+    fixed_by_severity = await analytics.fixed_by_severity(session, week)
     skills = [
         r
         for r in await analytics.breakdown(session, week, "skill")

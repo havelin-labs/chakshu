@@ -27,6 +27,17 @@ def _cost(value: float | None) -> Decimal | None:
     return Decimal(str(value)) if value is not None else None
 
 
+def _record_usage(run, result: Result) -> None:
+    """What the runner says the review cost: dollars, time and tokens."""
+    run.cost_usd = _cost(result.cost_usd)
+    run.duration_ms = result.duration_ms
+    if result.usage:
+        run.input_tokens = result.usage.input_tokens
+        run.output_tokens = result.usage.output_tokens
+        run.cache_read_tokens = result.usage.cache_read_tokens
+        run.cache_write_tokens = result.usage.cache_write_tokens
+
+
 async def _patches(ctx: RunContext) -> dict[str, str | None]:
     """The PR's diff at the reviewed commit, which decides where inline comments can go."""
     client = ctx.client
@@ -44,8 +55,7 @@ async def _patches(ctx: RunContext) -> dict[str, str | None]:
 
 async def _complete_reply(session: AsyncSession, ctx: RunContext, result: Result) -> None:
     run = ctx.run
-    run.cost_usd = _cost(result.cost_usd)
-    run.duration_ms = result.duration_ms
+    _record_usage(run, result)
     run.review_url = await replies.post(ctx, result)
     resolved = await replies.settle(session, ctx, result.outcome)
     run.result = {
@@ -65,8 +75,7 @@ async def complete(session: AsyncSession, ctx: RunContext, result: Result) -> No
     run, repo, reviewer = ctx.run, ctx.repo, ctx.reviewer
     client = ctx.client
     since = (run.result or {}).get("since")
-    run.cost_usd = _cost(result.cost_usd)
-    run.duration_ms = result.duration_ms
+    _record_usage(run, result)
 
     published = await publisher.publish(
         client,

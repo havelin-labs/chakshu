@@ -152,6 +152,11 @@ class Run(Base, JobMixin, TimestampMixin):
     reply_to: Mapped[int | None] = mapped_column(BigInteger)
     # Who opened the pull request, for usage views. Filled from the PR when the run is queued.
     pr_author: Mapped[str | None] = mapped_column(String(100), index=True)
+    # Tokens the review used, reported by the runner (None for runs from older runners).
+    input_tokens: Mapped[int | None] = mapped_column(BigInteger)
+    output_tokens: Mapped[int | None] = mapped_column(BigInteger)
+    cache_read_tokens: Mapped[int | None] = mapped_column(BigInteger)
+    cache_write_tokens: Mapped[int | None] = mapped_column(BigInteger)
 
     __table_args__ = (
         Index("ix_runs_status_created_at", "status", "created_at"),

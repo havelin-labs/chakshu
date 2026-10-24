@@ -91,6 +91,12 @@ async def cost(session: SessionDep, _: AdminDep) -> dict:
     return await analytics.cost(session)
 
 
+@router.get("/roi")
+async def roi(f: FiltersDep, session: SessionDep, _: AdminDep) -> dict:
+    """Fixed findings and spend, valued with the admin's own assumptions. An estimate, not a measurement."""
+    return await analytics.roi(session, f)
+
+
 @router.get("/findings")
 async def findings(
     f: FiltersDep,
