@@ -16,7 +16,7 @@ from fastapi.responses import PlainTextResponse
 from chakshu.api.deps import AdminDep, CredentialsDep, UserDep, csrf_protect
 from chakshu.db.session import SessionDep
 from chakshu.helpers import analytics as calc
-from chakshu.services import analytics, members, teams
+from chakshu.services import analytics, members, review_speed, teams
 from chakshu.services.analytics import Dimension, Filters
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"], dependencies=[Depends(csrf_protect)])
@@ -118,6 +118,12 @@ async def team_options(session: SessionDep, _: AdminDep) -> list[dict]:
 async def refresh_teams(session: SessionDep, creds: CredentialsDep, _: AdminDep) -> dict:
     """Fetch teams and memberships from GitHub now, instead of waiting for the nightly sync."""
     return {"teams_source": await teams.sync(session, creds)}
+
+
+@router.get("/speed")
+async def speed(f: FiltersDep, session: SessionDep, _: AdminDep) -> dict:
+    """Time to first human review and to merge, PRs Chakshu reviewed vs not, per repository."""
+    return {"small_sample": review_speed.SMALL_SAMPLE, "rows": await review_speed.speed(session, f)}
 
 
 @router.get("/cost")
