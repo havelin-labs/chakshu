@@ -7,6 +7,9 @@ their repos and paths say. Otherwise:
 2. paths:  at least one changed file matches (no paths means every file)
 3. event:  for automatic runs, the reviewer opted in to this PR event
 Nothing left and someone asked: fall back to the org's `default` reviewer.
+`default` is also an ordinary reviewer: if its own repos and paths cover the pull
+request (the template uses repos ["*"]), it runs alongside the others, not only as
+the fallback.
 """
 
 import re
