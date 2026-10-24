@@ -252,6 +252,10 @@ export type AppPermissions = {
 export type SecretsSync = { synced: string[]; failed: Record<string, string> }
 export type AnalyticsRow = {
   key: string
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_write_tokens: number
   reviews: number
   prs: number
   engaged: number
@@ -406,4 +410,11 @@ export type PersonActivityPage = {
   hidden_reason: HiddenReason | null
   items: PersonActivityItem[]
   next_cursor: string | null
+}
+
+export type RoiView = {
+  assumptions: { minutes: Record<Severity, number>; hourly_rate: number | null }
+  fixed_by_severity: Partial<Record<Severity, number>>
+  spend: number
+  estimate: { hours_saved: number; gross_value: number; net_value: number } | null
 }
