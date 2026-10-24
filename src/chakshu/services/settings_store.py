@@ -32,6 +32,7 @@ class Key(StrEnum):
     MAX_USD_PER_REVIEW = "review.max_usd"
     MONTHLY_CAP_USD = "review.monthly_cap_usd"
     ACTIONS_ACTION = "actions.action"  # owner/repo@ref of the action the workflow runs
+    ACTIONS_RUNS_ON = "actions.runs_on"  # default runner labels for the workflow, e.g. "self-hosted, linux"
     ANALYTICS_SHOW_NAMES = "analytics.show_names"  # "true" or "false": name people in analytics
     ANALYTICS_MIN_GROUP = (
         "analytics.min_group"  # hide grouped numbers covering fewer people than this; 1 is off

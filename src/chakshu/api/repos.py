@@ -9,13 +9,16 @@ from sqlalchemy import select
 from chakshu.api.deps import AdminDep, CredentialsDep, UserDep, csrf_protect
 from chakshu.db.models import Installation, Repo
 from chakshu.db.session import SessionDep
+from chakshu.helpers import workflow
 from chakshu.services import github, installations, repo_setup, triggers
 
 router = APIRouter(prefix="/api/repos", tags=["repos"], dependencies=[Depends(csrf_protect)])
 
 
 class RepoUpdate(BaseModel):
-    enabled: bool
+    enabled: bool | None = None
+    # Runner labels for this repo's workflow, e.g. "self-hosted, linux". An empty string uses the org default.
+    runs_on: str | None = Field(default=None, max_length=500)
 
 
 class ReviewBody(BaseModel):
@@ -56,9 +59,16 @@ async def sync_repos(session: SessionDep, creds: CredentialsDep, _: AdminDep) ->
 @router.put("/{repo_id}")
 async def update_repo(repo_id: uuid.UUID, body: RepoUpdate, session: SessionDep, _: AdminDep) -> dict:
     repo, _installation = await _load(session, repo_id)
-    repo.enabled = body.enabled
+    if body.enabled is not None:
+        repo.enabled = body.enabled
+    if body.runs_on is not None:
+        try:
+            labels = workflow.parse_runner(body.runs_on) if body.runs_on.strip() else None
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+        repo.runs_on = ", ".join(labels) if labels else None
     await session.commit()
-    return {"id": str(repo.id), "enabled": repo.enabled}
+    return {"id": str(repo.id), "enabled": repo.enabled, "runs_on": repo.runs_on}
 
 
 def _actions(status: repo_setup.ActionsStatus) -> dict:

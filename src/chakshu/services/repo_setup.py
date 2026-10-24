@@ -27,6 +27,8 @@ class ActionsStatus:
     workflow: WorkflowState
     proposal_url: str | None  # open PR adding or updating the workflow
     secrets: dict[str, bool] = field(default_factory=dict)
+    runs_on: list[str] = field(default_factory=list)  # labels the workflow should run on
+    runs_on_override: str | None = None  # this repo's own labels, if it has any
 
     @property
     def ready(self) -> bool:
@@ -35,6 +37,16 @@ class ActionsStatus:
 
 async def action_ref(session: AsyncSession) -> str:
     return await store.get(session, Key.ACTIONS_ACTION) or workflow.DEFAULT_ACTION
+
+
+async def runner_for(session: AsyncSession, repo: Repo) -> tuple[str, ...]:
+    """The repo's own runner labels, else the org default, else GitHub-hosted ubuntu-latest."""
+    default = await store.get(session, Key.ACTIONS_RUNS_ON)
+    return workflow.parse_runner(repo.runs_on or default)
+
+
+async def expected_workflow(session: AsyncSession, repo: Repo) -> str:
+    return workflow.render(await action_ref(session), await runner_for(session, repo))
 
 
 async def _workflow_state(client: GitHub, repo: Repo, expected: str) -> WorkflowState:
@@ -55,11 +67,13 @@ async def _workflow_state(client: GitHub, repo: Repo, expected: str) -> Workflow
 
 async def status(session: AsyncSession, client: GitHub, repo: Repo) -> ActionsStatus:
     owner, name = repo.full_name.split("/", 1)
-    expected = workflow.render(await action_ref(session))
+    expected = await expected_workflow(session, repo)
     return ActionsStatus(
         workflow=await _workflow_state(client, repo, expected),
         proposal_url=await proposals.open_proposal(client, owner, name, SETUP_BRANCH),
         secrets=await actions_secrets.present(client, repo.full_name),
+        runs_on=list(await runner_for(session, repo)),
+        runs_on_override=repo.runs_on,
     )
 
 
@@ -93,7 +107,7 @@ def _change(repo: Repo, content: str, requester: str, adding: bool) -> proposals
 
 async def set_up(session: AsyncSession, client: GitHub, repo: Repo, requester: str) -> ActionsStatus:
     """Propose the workflow if it's missing or old, and write the secrets. Returns the new status."""
-    expected = workflow.render(await action_ref(session))
+    expected = await expected_workflow(session, repo)
     state = await _workflow_state(client, repo, expected)
     if state != "current":
         await proposals.open_pull_request(

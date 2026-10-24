@@ -43,6 +43,8 @@ class SettingsUpdate(BaseModel):
     reviewers_repo: str = Field(pattern=r"^[A-Za-z0-9._-]{1,100}$")
     # owner/repo@ref of the action the review workflow runs; None keeps the current one.
     actions_action: str | None = Field(default=None, pattern=r"^[\w.-]+/[\w.-]+(/[\w./-]+)?@[\w./-]+$")
+    # Default runner labels for every repo's workflow; an empty string means GitHub-hosted ubuntu-latest.
+    actions_runs_on: str | None = Field(default=None, max_length=500)
 
 
 # Write-only secrets: request field -> (setting, environment variable that can stand in for it)
@@ -63,6 +65,7 @@ async def _read(session: SessionDep) -> dict:
         Key.MAX_USD_PER_REVIEW,
         Key.REVIEWERS_REPO,
         Key.ACTIONS_ACTION,
+        Key.ACTIONS_RUNS_ON,
         *(key for key, _ in SECRETS.values()),
     )
     budget = await spend.current(session)
@@ -75,6 +78,7 @@ async def _read(session: SessionDep) -> dict:
         "spend_this_month": float(budget.month_to_date),
         "reviewers_repo": values[Key.REVIEWERS_REPO],
         "actions_action": values[Key.ACTIONS_ACTION] or workflow.DEFAULT_ACTION,
+        "actions_runs_on": ", ".join(workflow.parse_runner(values[Key.ACTIONS_RUNS_ON])),
         "runner_url": get_config().public_runner_url,
         "runner_public": is_public_url(get_config().public_runner_url),
         "webhooks": {
@@ -101,6 +105,12 @@ async def update_settings(body: SettingsUpdate, session: SessionDep, _: AdminDep
     }
     if body.actions_action:
         values[Key.ACTIONS_ACTION] = body.actions_action
+    if body.actions_runs_on is not None:
+        try:
+            labels = workflow.parse_runner(body.actions_runs_on)
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+        values[Key.ACTIONS_RUNS_ON] = None if labels == workflow.DEFAULT_RUNNER else ", ".join(labels)
     changed_secret = False
     for field, (key, _) in SECRETS.items():
         submitted = getattr(body, field)
@@ -115,6 +125,24 @@ async def update_settings(body: SettingsUpdate, session: SessionDep, _: AdminDep
         # Reviews run in Actions with these as repository secrets, so a change goes out at once.
         result["secrets_sync"] = asdict(await actions_secrets.sync_all(session, creds))
     return result
+
+
+class RunnerUpdate(BaseModel):
+    # Runner labels, e.g. "self-hosted, linux, x64". An empty string means GitHub-hosted ubuntu-latest.
+    runs_on: str = Field(max_length=500)
+
+
+@router.put("/actions/runner")
+async def update_runner(body: RunnerUpdate, session: SessionDep, _: AdminDep) -> dict:
+    """The default runner every repo's workflow uses unless the repo sets its own."""
+    try:
+        labels = workflow.parse_runner(body.runs_on)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    stored = None if labels == workflow.DEFAULT_RUNNER else ", ".join(labels)
+    await store.put_many(session, {Key.ACTIONS_RUNS_ON: stored})
+    await session.commit()
+    return {"actions_runs_on": ", ".join(labels)}
 
 
 @router.post("/actions/secrets")

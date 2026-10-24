@@ -62,6 +62,8 @@ class Repo(Base, TimestampMixin):
     default_branch: Mapped[str] = mapped_column(String(200), default="main")
     private: Mapped[bool] = mapped_column(Boolean, default=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Runner labels for this repo's review workflow; None uses the org-wide default.
+    runs_on: Mapped[str | None] = mapped_column(String(500))
 
 
 class Reviewer(Base, TimestampMixin):
