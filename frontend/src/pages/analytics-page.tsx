@@ -5,6 +5,7 @@ import { Link, Navigate, useSearchParams } from "react-router-dom"
 import { CapMeter, DailyBars, InlineBar, StatTile } from "@/components/analytics-charts"
 import { FilterBar, FilterSelect } from "@/components/analytics-filters"
 import { ErrorNotice, Notice } from "@/components/notice"
+import { RoiPanel } from "@/components/roi-panel"
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -242,6 +243,7 @@ function CostTab() {
           )}
         </CardContent>
       </Card>
+      <TokenMix rows={by.model} />
       {sections.map(([key, name]) => (
         <Card key={key}>
           <CardContent className="space-y-2">
@@ -250,7 +252,52 @@ function CostTab() {
           </CardContent>
         </Card>
       ))}
+      <RoiPanel query="days=30" />
     </div>
+  )
+}
+
+// Where the tokens go, per model: bigger diffs show up as input, cached context as cache reads.
+function TokenMix({ rows }: { rows: AnalyticsRow[] }) {
+  const used = rows.filter((r) => r.input_tokens + r.output_tokens + r.cache_read_tokens + r.cache_write_tokens > 0)
+  return (
+    <Card>
+      <CardContent className="space-y-2">
+        <h3 className="font-semibold">Tokens this month by model</h3>
+        {used.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No token counts yet. Runners report them from this version on; earlier reviews only have their cost.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Model</TableHead>
+                  <TableHead className="text-right">Input</TableHead>
+                  <TableHead className="text-right">Output</TableHead>
+                  <TableHead className="text-right">Cache reads</TableHead>
+                  <TableHead className="text-right">Cache writes</TableHead>
+                  <TableHead className="text-right">Spend</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {used.map((r) => (
+                  <TableRow key={r.key}>
+                    <TableCell className="font-medium">{r.key}</TableCell>
+                    <TableCell className="text-right tabular-nums">{count(r.input_tokens)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{count(r.output_tokens)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{count(r.cache_read_tokens)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{count(r.cache_write_tokens)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{cost(r.spend)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
