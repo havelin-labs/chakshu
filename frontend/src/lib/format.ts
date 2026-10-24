@@ -23,6 +23,12 @@ export function duration(ms: number | null): string {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`
 }
 
+export function hours(value: number | null): string {
+  if (value == null) return "—"
+  if (value < 1) return `${Math.round(value * 60)}m`
+  return value < 48 ? `${value.toFixed(1)}h` : `${(value / 24).toFixed(1)}d`
+}
+
 export const shortSha = (sha: string) => sha.slice(0, 7)
 
 export function percent(value: number | null): string {

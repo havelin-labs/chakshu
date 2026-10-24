@@ -280,6 +280,11 @@ export type TeamsView = { min_group: number; teams_source: MembersSource; rows: 
 
 export type TeamOption = { id: number; org: string; slug: string; name: string; deleted: boolean }
 
+export type SpeedMetric = { n: number; median_hours: number | null; p90_hours: number | null; small_sample: boolean }
+export type SpeedCohort = { prs: number; first_review: SpeedMetric; merge: SpeedMetric }
+export type SpeedRow = { repo_id: string; repo: string; reviewed: SpeedCohort; not_reviewed: SpeedCohort }
+export type SpeedView = { small_sample: number; rows: SpeedRow[] }
+
 export type Tile = { value: number | null; previous: number | null; change: number | null }
 
 export type Overview = {
