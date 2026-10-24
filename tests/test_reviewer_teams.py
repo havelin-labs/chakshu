@@ -152,3 +152,32 @@ async def test_clearing_requests_covers_each_team_and_survives_errors(monkeypatc
     monkeypatch.setattr(github, "installation_client", lambda creds, iid: client)
     await triggers.clear_team_request(None, 1, "acme/api", 7, teams=["chakshu-security", "chakshu"])
     assert calls == ["chakshu", "chakshu-security"]
+
+
+async def test_a_request_that_runs_nothing_new_is_cleared_at_once(db, org, monkeypatch):
+    cleared = []
+
+    async def fake_resolve(ctx, payload):
+        return org, SimpleNamespace(full_name="acme/api", id=uuid.uuid4())
+
+    async def already(session, creds, request):
+        return triggers.Outcome(already=["security"])
+
+    async def clear(creds, installation_id, full_name, number, teams=()):
+        cleared.append(list(teams))
+
+    async def no_speed(ctx, payload):
+        return None
+
+    monkeypatch.setattr(pull_request, "resolve", fake_resolve)
+    monkeypatch.setattr(pull_request, "record_speed", no_speed)
+    monkeypatch.setattr(triggers, "request_review", already)
+    monkeypatch.setattr(triggers, "clear_team_request", clear)
+    payload = {
+        "action": "review_requested",
+        "requested_team": {"slug": "chakshu-security"},
+        "sender": {"login": "mona"},
+        "pull_request": {"number": 7},
+    }
+    await pull_request.handle(Context(db, None, "d3"), payload)
+    assert cleared == [["chakshu-security"]]
