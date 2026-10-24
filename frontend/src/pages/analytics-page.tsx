@@ -18,13 +18,15 @@ import {
   type CostView,
   type FindingRow,
   type Overview,
+  type SpeedMetric,
+  type SpeedView,
   type TeamsView,
 } from "@/lib/api"
-import { cost, count, percent, timeAgo } from "@/lib/format"
+import { cost, count, hours, percent, timeAgo } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 const PERIODS = [7, 30, 90, 180, 365]
-const TABS = ["overview", "repos", "reviewers", "skills", "teams", "people", "cost", "findings"] as const
+const TABS = ["overview", "repos", "reviewers", "skills", "teams", "speed", "people", "cost", "findings"] as const
 type Tab = (typeof TABS)[number]
 const TAB_LABEL: Record<Tab, string> = {
   overview: "Overview",
@@ -32,6 +34,7 @@ const TAB_LABEL: Record<Tab, string> = {
   reviewers: "Reviewers",
   skills: "Skills",
   teams: "Teams",
+  speed: "Review speed",
   people: "People",
   cost: "Cost",
   findings: "Findings",
@@ -273,6 +276,77 @@ function TeamsTab({ filters }: { filters: Filters }) {
   )
 }
 
+function SpeedCell({ metric, small }: { metric: SpeedMetric; small: number }) {
+  return (
+    <TableCell
+      className={cn("whitespace-nowrap text-right tabular-nums", metric.small_sample && "text-muted-foreground")}
+      title={metric.small_sample ? `Fewer than ${small} PRs, too few to read much into` : `${metric.n} PRs`}
+    >
+      {hours(metric.median_hours)} <span className="text-muted-foreground">/ {hours(metric.p90_hours)}</span>
+    </TableCell>
+  )
+}
+
+// PRs Chakshu reviewed next to the ones it didn't, in the same repository. A cohort comparison, not a cause.
+function SpeedTab({ filters }: { filters: Filters }) {
+  const query = new URLSearchParams(filters.query)
+  for (const key of ["reviewer", "trigger", "team"]) query.delete(key) // only period and repository apply
+  const data = useQuery({
+    queryKey: ["analytics", "speed", query.toString()],
+    queryFn: () => apiGet<SpeedView>(`/api/analytics/speed?${query}`),
+  })
+  if (data.error) return <ErrorNotice error={data.error} />
+  if (!data.data) return null
+  const { rows, small_sample } = data.data
+  return (
+    <Card>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Median / P90 hours from ready for review to the first review by a person, and to merge, for PRs opened in the
+          period.
+        </p>
+        {!rows.length ? (
+          <Notice>No pull requests recorded in this period yet. Recording starts with the pull_request_review event.</Notice>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Repository</TableHead>
+                  <TableHead className="text-right">PRs reviewed / not</TableHead>
+                  <TableHead className="text-right">First review, reviewed</TableHead>
+                  <TableHead className="text-right">First review, not</TableHead>
+                  <TableHead className="text-right">Merge, reviewed</TableHead>
+                  <TableHead className="text-right">Merge, not</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((r) => (
+                  <TableRow key={r.repo_id}>
+                    <TableCell className="font-medium">{r.repo}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {count(r.reviewed.prs)} / {count(r.not_reviewed.prs)}
+                    </TableCell>
+                    <SpeedCell metric={r.reviewed.first_review} small={small_sample} />
+                    <SpeedCell metric={r.not_reviewed.first_review} small={small_sample} />
+                    <SpeedCell metric={r.reviewed.merge} small={small_sample} />
+                    <SpeedCell metric={r.not_reviewed.merge} small={small_sample} />
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">
+          This compares two groups of PRs; it doesn't show that Chakshu caused a difference. Teams often turn Chakshu on
+          for some PRs and not others, and those PRs can differ in size and urgency. Reviews by bots, Chakshu included,
+          and PRs opened by bots are left out. Grey values cover fewer than {small_sample} PRs.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
 function CostTab() {
   const data = useQuery({ queryKey: ["analytics", "cost"], queryFn: () => apiGet<CostView>("/api/analytics/cost") })
   if (data.error) return <ErrorNotice error={data.error} />
@@ -452,6 +526,7 @@ export function AnalyticsPage() {
     reviewers: <BreakdownTab filters={filters} by="reviewer" />,
     skills: <BreakdownTab filters={filters} by="skill" />,
     teams: <TeamsTab filters={filters} />,
+    speed: <SpeedTab filters={filters} />,
     // The People view has its own page; carry the filters over.
     people: <Navigate to={`/analytics/people${peopleQuery(filters)}`} replace />,
     cost: <CostTab />,
