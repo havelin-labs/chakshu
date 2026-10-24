@@ -247,6 +247,24 @@ class OrgMember(Base):
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class PrEvent(Base):
+    """When a pull request reached a milestone, for review speed. One row per PR and kind, the earliest seen.
+
+    Kinds: opened, ready (left draft), first_review (first review by a person other than the author),
+    merged. Bot-authored pull requests aren't recorded.
+    """
+
+    __tablename__ = "pr_events"
+    __table_args__ = (Index("uq_pr_events_pr_kind", "repo_id", "pr_number", "kind", unique=True),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
+    pr_number: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(20))
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    actor: Mapped[str | None] = mapped_column(String(100))
+
+
 class GithubTeam(Base):
     """A team in an installed organization, as GitHub last listed it. Kept after deletion for history."""
 

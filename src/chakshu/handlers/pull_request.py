@@ -1,8 +1,8 @@
-"""Pull request events: review requests for the chakshu team, automatic runs, and closing."""
+"""Pull request events: review requests for the chakshu team, automatic runs, closing, and review speed."""
 
-from chakshu.handlers.context import Context, Payload, resolve
+from chakshu.handlers.context import Context, Payload, installation_for, resolve
 from chakshu.helpers import mentions
-from chakshu.services import finding_stats, github, triggers
+from chakshu.services import finding_stats, github, installations, review_speed, triggers
 
 AUTO_ACTIONS = frozenset({"opened", "reopened", "ready_for_review", "synchronize"})
 
@@ -17,9 +17,24 @@ async def _closed(ctx: Context, payload: Payload) -> None:
     await finding_stats.sweep(ctx.session, client, repo.full_name, payload["pull_request"]["number"], set())
 
 
+async def record_speed(ctx: Context, payload: Payload) -> None:
+    """Review speed covers every repo, including ones Chakshu doesn't review, for the comparison."""
+    installation = await installation_for(ctx, payload)
+    if installation is None or not payload.get("repository") or not payload.get("pull_request"):
+        return
+    repo = await installations.ensure_repo(ctx.session, ctx.creds, installation, payload["repository"])
+    if review := payload.get("review"):
+        await review_speed.from_review(ctx.session, repo, review, payload["pull_request"])
+    else:
+        await review_speed.from_pull_request(
+            ctx.session, repo, payload.get("action"), payload["pull_request"]
+        )
+
+
 async def handle(ctx: Context, payload: Payload) -> None:
     action = payload.get("action")
     pr = payload.get("pull_request") or {}
+    await record_speed(ctx, payload)
     requested_team = (payload.get("requested_team") or {}).get("slug")
 
     if action == "closed":

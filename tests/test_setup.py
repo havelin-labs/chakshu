@@ -58,6 +58,7 @@ def test_manifest_includes_webhooks_for_public_urls(monkeypatch):
         "organization",
         "team",
         "membership",
+        "pull_request_review",
     }
 
 
