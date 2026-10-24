@@ -2,9 +2,10 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlalchemy import select
 
 from chakshu.api import deps
-from chakshu.db.models import Run, User
+from chakshu.db.models import GithubTeam, PrEvent, Repo, Run, TeamMembership, User
 from chakshu.services import analytics, pr_authors, retention
 from chakshu.services import settings_store as store
 from chakshu.services.settings_store import Key
@@ -34,6 +35,38 @@ async def test_retention_clears_people_only_on_older_runs(db, seed_runs):
     assert (recent_run.requested_by, recent_run.pr_author) == ("alice", "bob")
     assert old_run.cost_usd == recent_run.cost_usd  # only the person fields go
     assert await retention.apply(db) == 0  # nothing left to clear
+
+
+async def test_retention_also_clears_pr_event_people_and_ended_memberships(db, seed_runs):
+    (run_id,) = await seed_runs(1)
+    repo = await db.get(Repo, (await db.get(Run, run_id)).repo_id)
+    now = datetime.now(UTC)
+    old, recent = now - timedelta(days=100), now - timedelta(days=5)
+    db.add(
+        GithubTeam(
+            id=1, installation_id=repo.installation_id, org="acme", slug="web", name="Web", synced_at=now
+        )
+    )
+    db.add_all(
+        [
+            PrEvent(id=uuid.uuid4(), repo_id=repo.id, pr_number=1, kind="opened", at=old, actor="alice"),
+            PrEvent(id=uuid.uuid4(), repo_id=repo.id, pr_number=2, kind="opened", at=recent, actor="alice"),
+            TeamMembership(id=uuid.uuid4(), team_id=1, login="alice", login_lower="alice", valid_to=old),
+            TeamMembership(id=uuid.uuid4(), team_id=1, login="bob", login_lower="bob", valid_to=recent),
+            TeamMembership(id=uuid.uuid4(), team_id=1, login="carol", login_lower="carol"),
+        ]
+    )
+    await store.put(db, Key.ANALYTICS_RETENTION_DAYS, "90")
+    await db.commit()
+    await retention.apply(db)
+
+    actors = {
+        e.pr_number: e.actor
+        for e in (await db.scalars(select(PrEvent).execution_options(populate_existing=True))).all()
+    }
+    assert actors == {1: None, 2: "alice"}
+    kept = set((await db.scalars(select(TeamMembership.login))).all())
+    assert kept == {"bob", "carol"}  # only memberships that ended before the cutoff go
 
 
 @pytest.fixture
