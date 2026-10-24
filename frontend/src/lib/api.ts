@@ -199,6 +199,7 @@ export type AdminSettings = {
   spend_this_month: number
   reviewers_repo: string
   actions_action: string
+  actions_runs_on: string
   runner_url: string
   runner_public: boolean
   webhooks: { url: string; public: boolean; secret_set: boolean; events: string[] }
@@ -238,6 +239,8 @@ export type ActionsStatus = {
   workflow: "current" | "outdated" | "missing"
   proposal_url: string | null
   secrets: Record<string, boolean>
+  runs_on: string[]
+  runs_on_override: string | null
   ready: boolean
 }
 

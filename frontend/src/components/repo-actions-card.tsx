@@ -1,15 +1,56 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useState } from "react"
 
 import { ErrorNotice, Notice } from "@/components/notice"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { apiGet, apiPost, type ActionsStatus } from "@/lib/api"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { apiGet, apiPost, apiPut, type ActionsStatus } from "@/lib/api"
 
 const WORKFLOW_TEXT: Record<ActionsStatus["workflow"], string> = {
   current: "The workflow is in place.",
-  outdated: "The workflow is there but older than this Chakshu version expects.",
+  outdated: "The workflow is there but doesn't match the current settings (Chakshu version or runner labels).",
   missing: "The workflow isn't on the default branch yet.",
+}
+
+// This repo's own runner labels. Empty means the org default from Settings.
+function RepoRunner({ repoId, status }: { repoId: string; status: ActionsStatus }) {
+  const queryClient = useQueryClient()
+  const [value, setValue] = useState<string | null>(null)
+  const save = useMutation({
+    mutationFn: (runs_on: string) => apiPut(`/api/repos/${repoId}`, { runs_on }),
+    onSuccess: () => {
+      setValue(null)
+      queryClient.invalidateQueries({ queryKey: ["actions", repoId] })
+    },
+  })
+  const shown = value ?? status.runs_on_override ?? ""
+  return (
+    <form
+      className="space-y-2"
+      onSubmit={(e) => {
+        e.preventDefault()
+        save.mutate(shown)
+      }}
+    >
+      <Label htmlFor={`runs-on-${repoId}`}>Runner labels for this repository</Label>
+      <div className="flex flex-wrap gap-2">
+        <Input
+          id={`runs-on-${repoId}`}
+          className="max-w-md font-mono"
+          value={shown}
+          placeholder={`Org default: ${status.runs_on.join(", ")}`}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <Button type="submit" variant="outline" disabled={save.isPending || value === null}>
+          {save.isPending ? "Saving…" : "Save"}
+        </Button>
+      </div>
+      <ErrorNotice error={save.error} />
+    </form>
+  )
 }
 
 // Whether this repo can run reviews in GitHub Actions, and a button for admins to get it there.
@@ -41,6 +82,10 @@ export function RepoActionsCard({ repoId, isAdmin }: { repoId: string; isAdmin: 
         {data && (
           <ul className="space-y-1 text-sm">
             <li>{WORKFLOW_TEXT[data.workflow]}</li>
+            <li>
+              Runs on <code className="font-mono">{data.runs_on.join(", ")}</code>
+              {data.runs_on.includes("self-hosted") ? " (your own runners)." : " (GitHub-hosted)."}
+            </li>
             <li>{hasSecret ? "The Claude credential is in the repository secrets." : "No Claude credential in the repository secrets."}</li>
           </ul>
         )}
@@ -53,6 +98,7 @@ export function RepoActionsCard({ repoId, isAdmin }: { repoId: string; isAdmin: 
             to finish.
           </Notice>
         )}
+        {isAdmin && data && <RepoRunner repoId={repoId} status={data} />}
         {isAdmin && data && (data.workflow !== "current" || !hasSecret) && (
           <Button onClick={() => setUp.mutate()} disabled={setUp.isPending}>
             {setUp.isPending ? "Setting up…" : "Set up GitHub Actions"}
