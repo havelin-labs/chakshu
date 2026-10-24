@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { ReactNode } from "react"
 import { Link, Navigate, useSearchParams } from "react-router-dom"
 
@@ -13,22 +13,25 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   apiGet,
+  apiPost,
   type AnalyticsRow,
   type CostView,
   type FindingRow,
   type Overview,
+  type TeamsView,
 } from "@/lib/api"
 import { cost, count, percent, timeAgo } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 const PERIODS = [7, 30, 90, 180, 365]
-const TABS = ["overview", "repos", "reviewers", "skills", "people", "cost", "findings"] as const
+const TABS = ["overview", "repos", "reviewers", "skills", "teams", "people", "cost", "findings"] as const
 type Tab = (typeof TABS)[number]
 const TAB_LABEL: Record<Tab, string> = {
   overview: "Overview",
   repos: "Repositories",
   reviewers: "Reviewers",
   skills: "Skills",
+  teams: "Teams",
   people: "People",
   cost: "Cost",
   findings: "Findings",
@@ -53,7 +56,7 @@ function useFilters() {
   const set = (key: string, value: string | null) => update({ [key]: value })
   const days = Number(params.get("days") ?? 30)
   const query = new URLSearchParams({ days: String(days) })
-  for (const key of ["repo_id", "reviewer", "trigger"]) {
+  for (const key of ["repo_id", "reviewer", "trigger", "team"]) {
     const value = params.get(key)
     if (value) query.set(key, value)
   }
@@ -63,6 +66,7 @@ function useFilters() {
     repoId: params.get("repo_id"),
     reviewer: params.get("reviewer"),
     trigger: params.get("trigger"),
+    team: params.get("team"),
     skill: params.get("skill"),
     outcome: params.get("outcome"),
     query: query.toString(),
@@ -206,6 +210,64 @@ function BreakdownTab({ filters, by }: { filters: Filters; by: "repo" | "reviewe
         </div>
         <ErrorNotice error={data.error} />
         {data.data && <BreakdownTable rows={data.data} name={names[by]} onPick={pick} />}
+      </CardContent>
+    </Card>
+  )
+}
+
+// A run counts for every team its author or requester was directly in at the time, so rows overlap.
+function TeamsTab({ filters }: { filters: Filters }) {
+  const queryClient = useQueryClient()
+  const query = new URLSearchParams(filters.query)
+  query.delete("team") // every team is a row here
+  const data = useQuery({
+    queryKey: ["analytics", "teams", query.toString()],
+    queryFn: () => apiGet<TeamsView>(`/api/analytics/teams?${query}`),
+  })
+  const refresh = useMutation({
+    mutationFn: () => apiPost("/api/analytics/teams/refresh"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["analytics"] }),
+  })
+  if (data.error) return <ErrorNotice error={data.error} />
+  if (!data.data) return null
+  const { rows, min_group, teams_source } = data.data
+  const shown = rows.flatMap((r) => (r.hidden ? [] : [r]))
+  const hidden = rows.length - shown.length
+  const pick = (key: string) => {
+    const team = shown.find((r) => r.key === key)
+    if (team) filters.update({ team: String(team.team_id), tab: null })
+  }
+  return (
+    <Card>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-muted-foreground">Pick a team to filter every view by it.</p>
+          <Button variant="outline" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
+            {refresh.isPending ? "Refreshing…" : "Refresh teams"}
+          </Button>
+        </div>
+        <ErrorNotice error={refresh.error} />
+        {teams_source.stale && (
+          <Notice>
+            GitHub couldn't be reached on the last team sync, so these teams are from{" "}
+            {teams_source.synced_at ? timeAgo(teams_source.synced_at) : "an earlier sync"}.
+          </Notice>
+        )}
+        {!teams_source.synced_at && !rows.length ? (
+          <Notice>Teams haven't been synced from GitHub yet. They sync nightly, or refresh them now.</Notice>
+        ) : (
+          <BreakdownTable rows={shown} name="Team" onPick={pick} />
+        )}
+        {hidden > 0 && (
+          <p className="text-sm text-muted-foreground">
+            {hidden} team(s) hidden because fewer than {min_group} of their people appear in this slice.
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          A run counts for every team its PR author or requester was directly in when it ran, so team rows don't add up
+          to the total. Members of child teams aren't counted in the parent. Runs from before the first team sync use
+          the teams people were in at that sync.
+        </p>
       </CardContent>
     </Card>
   )
@@ -389,6 +451,7 @@ export function AnalyticsPage() {
     repos: <BreakdownTab filters={filters} by="repo" />,
     reviewers: <BreakdownTab filters={filters} by="reviewer" />,
     skills: <BreakdownTab filters={filters} by="skill" />,
+    teams: <TeamsTab filters={filters} />,
     // The People view has its own page; carry the filters over.
     people: <Navigate to={`/analytics/people${peopleQuery(filters)}`} replace />,
     cost: <CostTab />,
