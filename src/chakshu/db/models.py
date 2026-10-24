@@ -247,6 +247,48 @@ class OrgMember(Base):
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class GithubTeam(Base):
+    """A team in an installed organization, as GitHub last listed it. Kept after deletion for history."""
+
+    __tablename__ = "github_teams"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)  # GitHub's team ID
+    installation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("installations.id", ondelete="CASCADE"))
+    org: Mapped[str] = mapped_column(String(100))
+    slug: Mapped[str] = mapped_column(String(100))
+    name: Mapped[str] = mapped_column(String(200))
+    parent_id: Mapped[int | None] = mapped_column(BigInteger)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class TeamMembership(Base):
+    """Someone's direct membership of a team over a span of time, so a reorg doesn't rewrite history.
+
+    `valid_from` is None for memberships found on the first sync of a team: they started before
+    Chakshu was watching. `valid_to` is None while the membership lasts.
+    """
+
+    __tablename__ = "team_memberships"
+    __table_args__ = (
+        Index(
+            "uq_team_memberships_open",
+            "team_id",
+            "login_lower",
+            unique=True,
+            postgresql_where=text("valid_to IS NULL"),
+        ),
+        Index("ix_team_memberships_login_lower", "login_lower", "team_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    team_id: Mapped[int] = mapped_column(ForeignKey("github_teams.id", ondelete="CASCADE"))
+    login: Mapped[str] = mapped_column(String(100))
+    login_lower: Mapped[str] = mapped_column(String(100))
+    valid_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    valid_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class WebhookEvent(Base, JobMixin, TimestampMixin):
     """A GitHub webhook delivery, stored before it's handled so nothing is lost on restart.
 

@@ -29,6 +29,7 @@ from chakshu.services import (
     queue,
     retention,
     review_results,
+    teams,
 )
 
 log = logging.getLogger("chakshu.worker")
@@ -88,11 +89,12 @@ class Worker:
             if not busy:
                 await self._pause(POLL_SECONDS)
 
-    # Heartbeats, recovery of jobs from dead workers, expiry of silent runners, member sync, pruning.
+    # Heartbeats, recovery of jobs from dead workers, expiry of silent runners, member and team sync, pruning.
     async def maintenance_loop(self) -> None:
         last_prune = 0.0
         last_retention = -RETENTION_EVERY  # apply on the first pass
         last_members = -members.SYNC_EVERY.total_seconds()  # sync on the first pass
+        last_teams = -teams.SYNC_EVERY.total_seconds()
         while True:
             ALIVE_FILE.write_text(str(time.time()))
             try:
@@ -107,6 +109,9 @@ class Worker:
                         if time.monotonic() - last_members > members.SYNC_EVERY.total_seconds():
                             last_members = time.monotonic()
                             await members.sync(session, creds)
+                        if time.monotonic() - last_teams > teams.SYNC_EVERY.total_seconds():
+                            last_teams = time.monotonic()
+                            await teams.sync(session, creds)
                     await alerts.run(session)
                     if time.monotonic() - last_retention > RETENTION_EVERY:
                         last_retention = time.monotonic()

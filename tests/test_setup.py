@@ -56,6 +56,8 @@ def test_manifest_includes_webhooks_for_public_urls(monkeypatch):
         "push",
         "workflow_run",
         "organization",
+        "team",
+        "membership",
     }
 
 

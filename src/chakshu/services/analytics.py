@@ -15,19 +15,21 @@ from dataclasses import asdict, dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 
-from sqlalchemy import Select, case, distinct, func, select, tuple_, union_all
+from sqlalchemy import Select, and_, case, distinct, exists, func, or_, select, tuple_, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chakshu.core.config import get_settings
 from chakshu.db.models import (
     AnalyticsAudit,
     FindingOutcome,
+    GithubTeam,
     OrgMember,
     PostedFinding,
     Repo,
     Reviewer,
     Run,
     RunStatus,
+    TeamMembership,
     User,
 )
 from chakshu.helpers import analytics as calc
@@ -48,6 +50,7 @@ class Filters:
     repo_id: uuid.UUID | None = None
     reviewer: str | None = None
     trigger: str | None = None
+    team_id: int | None = None  # runs whose author or requester was directly in this team at the time
 
     @classmethod
     def last(cls, days: int, **kwargs) -> "Filters":
@@ -91,8 +94,23 @@ async def privacy(session: AsyncSession) -> Privacy:
     )
 
 
+def _member_then():
+    """A membership row that covers the run's author or requester when the run was created."""
+    return and_(
+        TeamMembership.login_lower.in_([func.lower(Run.pr_author), func.lower(Run.requested_by)]),
+        or_(TeamMembership.valid_from.is_(None), TeamMembership.valid_from <= Run.created_at),
+        or_(TeamMembership.valid_to.is_(None), Run.created_at < TeamMembership.valid_to),
+    )
+
+
+def _in_team(team_id: int):
+    return exists().where(TeamMembership.team_id == team_id, _member_then())
+
+
 def _runs(stmt: Select, f: Filters) -> Select:
     stmt = stmt.where(Run.created_at >= f.start, Run.created_at < f.end)
+    if f.team_id:
+        stmt = stmt.where(_in_team(f.team_id))
     if f.repo_id:
         stmt = stmt.where(Run.repo_id == f.repo_id)
     if f.reviewer:
@@ -117,6 +135,8 @@ def _findings(stmt: Select, f: Filters) -> Select:
         )
     if f.trigger:
         stmt = stmt.where(Run.trigger == f.trigger)
+    if f.team_id:
+        stmt = stmt.where(_in_team(f.team_id))
     return stmt
 
 
@@ -282,6 +302,75 @@ async def breakdown(session: AsyncSession, f: Filters, by: Dimension) -> list[di
         rows[key] = rows.get(key, {}) | r._asdict()
     result = [_derive(counts | {"key": key}) for key, counts in rows.items()]
     return sorted(result, key=lambda r: (-r["spend"], -r.get("posted", 0), r["key"]))
+
+
+async def team_people(session: AsyncSession, f: Filters) -> int:
+    """How many of the filtered team's members show up in the slice. The minimum group size uses this."""
+    stmt = _runs(
+        select(func.count(distinct(TeamMembership.login_lower)))
+        .select_from(Run)
+        .join(TeamMembership, and_(TeamMembership.team_id == f.team_id, _member_then())),
+        replace(f, team_id=None),  # the join already limits it to the team
+    )
+    return await session.scalar(stmt) or 0
+
+
+async def by_team(session: AsyncSession, f: Filters, min_group: int) -> list[dict]:
+    """One row per team. A run counts for every team its author or requester was in at the time,
+    so rows overlap and don't add up to the total. Rows about fewer than `min_group` people are hidden.
+    """
+    f = replace(f, team_id=None)
+    # Runs and the teams they belong to. Findings can be posted after the run started, so only the
+    # end of the period bounds this.
+    run_teams = (
+        select(TeamMembership.team_id.label("team_id"), Run.id.label("run_id"))
+        .select_from(Run)
+        .join(TeamMembership, _member_then())
+        .where(Run.created_at < f.end)
+        .distinct()
+        .subquery()
+    )
+    rows: dict[int, dict] = {}
+    stmt = _runs(
+        select(run_teams.c.team_id.label("key"), *_run_columns())
+        .select_from(Run)
+        .join(run_teams, run_teams.c.run_id == Run.id),
+        f,
+    ).group_by(run_teams.c.team_id)
+    for r in (await session.execute(stmt)).all():
+        rows[r.key] = r._asdict()
+    stmt = (
+        _findings(select(run_teams.c.team_id.label("key"), *_finding_columns()), f)
+        .join(run_teams, run_teams.c.run_id == Run.id)
+        .group_by(run_teams.c.team_id)
+    )
+    for r in (await session.execute(stmt)).all():
+        rows[r.key] = rows.get(r.key, {}) | r._asdict()
+    people_stmt = _runs(
+        select(TeamMembership.team_id, func.count(distinct(TeamMembership.login_lower)).label("people"))
+        .select_from(Run)
+        .join(TeamMembership, _member_then()),
+        f,
+    ).group_by(TeamMembership.team_id)
+    people = {r.team_id: r.people for r in (await session.execute(people_stmt)).all()}
+    names = {
+        t.id: t for t in (await session.scalars(select(GithubTeam).where(GithubTeam.id.in_(rows)))).all()
+    }
+    result = []
+    for team_id, counts in rows.items():
+        team = names.get(team_id)
+        row = _derive(counts) | {
+            "key": team.name if team else str(team_id),
+            "team_id": team_id,
+            "slug": team.slug if team else None,
+            "org": team.org if team else None,
+            "deleted": bool(team and team.deleted_at),
+            "people": people.get(team_id, 0),
+        }
+        if not calc.visible(row["people"], min_group):
+            row = {k: row[k] for k in ("key", "team_id", "slug", "org", "deleted")} | {"hidden": True}
+        result.append(row | {"hidden": row.get("hidden", False)})
+    return sorted(result, key=lambda r: (r["hidden"], -r.get("spend", 0), r["key"]))
 
 
 def _iso(value: datetime | None) -> str | None:

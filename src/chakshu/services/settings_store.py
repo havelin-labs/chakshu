@@ -46,6 +46,8 @@ class Key(StrEnum):
     ALERTS_SENT = "alerts.sent"  # JSON: the month and the thresholds already announced in it
     DIGEST_SENT_WEEK = "alerts.digest_week"  # ISO week of the last digest sent
     MEMBERS_STALE = "members.stale"  # "true" when the last attempt failed and the list is older than it looks
+    TEAMS_SYNCED_AT = "teams.synced_at"  # when teams and memberships last came from GitHub (ISO 8601)
+    TEAMS_STALE = "teams.stale"  # "true" when the last team sync failed
 
 
 SECRET_KEYS = frozenset(
