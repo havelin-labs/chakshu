@@ -1,7 +1,9 @@
 """Admin settings. Secrets are write-only: the API returns whether they're set and a masked hint."""
 
+import json
 import os
 from dataclasses import asdict
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from githubkit.exception import RequestFailed
@@ -223,3 +225,27 @@ async def analytics_audit(
 ) -> list[dict]:
     """Who looked at, exported or changed analytics about named people, newest first."""
     return await analytics.audit_log(session, limit)
+
+
+class RoiUpdate(BaseModel):
+    """Minutes of review work one fixed finding saves, by severity, and what an hour costs."""
+
+    minutes: dict[Literal["critical", "high", "medium", "low", "info"], float] = Field(default_factory=dict)
+    hourly_rate: float | None = Field(default=None, ge=0, le=10_000)
+
+    @field_validator("minutes")
+    @classmethod
+    def _minutes(cls, value: dict) -> dict:
+        if any(not 0 <= v <= 600 for v in value.values()):
+            raise ValueError("Use 0 to 600 minutes per finding.")
+        return value
+
+
+@router.put("/analytics/roi")
+async def update_roi(body: RoiUpdate, session: SessionDep, user: AdminDep) -> dict:
+    """The ROI panel's assumptions. They're labelled as the admin's own wherever they're shown."""
+    await store.put(session, Key.ANALYTICS_ROI, json.dumps(body.model_dump()))
+    await analytics.record_access(
+        session, user.login, "settings.analytics.roi", "settings", body.model_dump()
+    )
+    return await analytics.roi_settings(session)

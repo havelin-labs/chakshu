@@ -47,6 +47,20 @@ class ReviewResult:
     duration_ms: int | None = None
     turns: int | None = None
     outcome: str | None = None  # replies: open, fixed or dismissed
+    usage: dict[str, int] | None = None  # see usage_of
+
+
+def usage_of(result: ResultMessage) -> dict[str, int] | None:
+    """Token counts from the SDK's usage block, under the names the runner protocol uses."""
+    raw = result.usage or {}
+    if not raw:
+        return None
+    return {
+        "input_tokens": int(raw.get("input_tokens") or 0),
+        "output_tokens": int(raw.get("output_tokens") or 0),
+        "cache_read_tokens": int(raw.get("cache_read_input_tokens") or 0),
+        "cache_write_tokens": int(raw.get("cache_creation_input_tokens") or 0),
+    }
 
 
 def _env(auth_env: dict[str, str], config_dir: Path) -> dict[str, str]:
@@ -131,6 +145,7 @@ async def review(
         cost_usd=result.total_cost_usd,
         duration_ms=result.duration_ms,
         turns=result.num_turns,
+        usage=usage_of(result),
     )
 
 
@@ -162,4 +177,5 @@ async def reply(
         duration_ms=result.duration_ms,
         turns=result.num_turns,
         outcome=outcome if outcome in REPLY_OUTCOMES else "open",
+        usage=usage_of(result),
     )

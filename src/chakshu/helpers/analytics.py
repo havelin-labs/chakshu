@@ -157,3 +157,21 @@ def to_csv(rows: Iterable[dict], columns: Sequence[str]) -> str:
     writer.writeheader()
     writer.writerows(rows)
     return out.getvalue()
+
+
+# The ROI panel's starting assumptions: minutes of review work a fixed finding saves, by severity.
+# They're the admin's to change; no study backs a universal number.
+DEFAULT_ROI_MINUTES = {"critical": 60.0, "high": 30.0, "medium": 15.0, "low": 5.0, "info": 0.0}
+
+
+def roi(
+    fixed_by_severity: dict[str, int], minutes: dict[str, float], hourly_rate: float, spend: float
+) -> dict:
+    """An estimate, labelled as one: hours saved and their value, against what the reviews cost."""
+    hours = sum(count * float(minutes.get(severity, 0)) for severity, count in fixed_by_severity.items()) / 60
+    gross = hours * hourly_rate
+    return {
+        "hours_saved": round(hours, 2),
+        "gross_value": round(gross, 2),
+        "net_value": round(gross - spend, 2),
+    }

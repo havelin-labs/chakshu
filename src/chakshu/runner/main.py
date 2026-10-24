@@ -21,7 +21,7 @@ from chakshu.connectors import bridge
 from chakshu.helpers import workspace as files
 from chakshu.runner import engine
 from chakshu.runner.client import OidcTokens, ServerClient, ServerError, http_client
-from chakshu.runner.protocol import Failure, Job, Result
+from chakshu.runner.protocol import Failure, Job, Result, Usage
 
 log = logging.getLogger("chakshu.action")
 
@@ -170,6 +170,7 @@ async def run(server: str, run_id: uuid.UUID, workspace: Path) -> int:
             duration_ms=reviewed.duration_ms,
             turns=reviewed.turns,
             outcome=reviewed.outcome,
+            usage=Usage(**reviewed.usage) if reviewed.usage else None,
         )
         if job.kind == "reply":
             log.info("Done (finding %s). Sending the answer to Chakshu to post.", result.outcome)
