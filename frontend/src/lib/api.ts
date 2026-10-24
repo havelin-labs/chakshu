@@ -271,6 +271,15 @@ export type AnalyticsRow = {
   engaged_share: number | null
 }
 
+export type TeamRow = { key: string; team_id: number; slug: string | null; org: string | null; deleted: boolean } & (
+  | ({ hidden: false; people: number } & AnalyticsRow)
+  | { hidden: true }
+)
+
+export type TeamsView = { min_group: number; teams_source: MembersSource; rows: TeamRow[] }
+
+export type TeamOption = { id: number; org: string; slug: string; name: string; deleted: boolean }
+
 export type Tile = { value: number | null; previous: number | null; change: number | null }
 
 export type Overview = {

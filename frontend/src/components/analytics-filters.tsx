@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 
 import { Button } from "@/components/ui/button"
-import { apiGet, type Repo, type Reviewer } from "@/lib/api"
+import { apiGet, type Repo, type Reviewer, type TeamOption } from "@/lib/api"
 
 const TRIGGERS = ["mention", "review_requested", "portal", "auto", "reply"]
 
@@ -35,10 +35,17 @@ export function FilterSelect({
   )
 }
 
-export type Slice = { days: number; repoId: string | null; reviewer: string | null; trigger: string | null }
-export type SliceKey = "days" | "repo_id" | "reviewer" | "trigger"
+// `team` is left out where a view doesn't offer the team filter.
+export type Slice = {
+  days: number
+  repoId: string | null
+  reviewer: string | null
+  trigger: string | null
+  team?: string | null
+}
+export type SliceKey = "days" | "repo_id" | "reviewer" | "trigger" | "team"
 
-// Period, repository, reviewer and trigger: the filters every analytics view shares.
+// Period, repository, reviewer, trigger and team: the filters the analytics views share.
 export function FilterBar({
   slice,
   periods,
@@ -50,6 +57,12 @@ export function FilterBar({
 }) {
   const repos = useQuery({ queryKey: ["repos"], queryFn: () => apiGet<Repo[]>("/api/repos") })
   const reviewers = useQuery({ queryKey: ["reviewers"], queryFn: () => apiGet<Reviewer[]>("/api/reviewers") })
+  const withTeams = slice.team !== undefined
+  const teams = useQuery({
+    queryKey: ["analytics", "team-options"],
+    queryFn: () => apiGet<TeamOption[]>("/api/analytics/teams/options"),
+    enabled: withTeams,
+  })
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
       <div className="flex flex-wrap gap-1" role="group" aria-label="Period">
@@ -83,6 +96,17 @@ export function FilterBar({
         onChange={(v) => onChange("trigger", v)}
         options={TRIGGERS.map((t) => ({ value: t, label: t.replace("_", " ") }))}
       />
+      {withTeams && (
+        <FilterSelect
+          label="Team"
+          value={slice.team ?? null}
+          onChange={(v) => onChange("team", v)}
+          options={(teams.data ?? []).map((t) => ({
+            value: String(t.id),
+            label: `${t.org}/${t.slug}${t.deleted ? " (deleted)" : ""}`,
+          }))}
+        />
+      )}
     </div>
   )
 }
