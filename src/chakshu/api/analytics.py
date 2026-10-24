@@ -16,7 +16,7 @@ from fastapi.responses import PlainTextResponse
 from chakshu.api.deps import AdminDep, CredentialsDep, UserDep, csrf_protect
 from chakshu.db.session import SessionDep
 from chakshu.helpers import analytics as calc
-from chakshu.services import analytics, members
+from chakshu.services import analytics, members, teams
 from chakshu.services.analytics import Dimension, Filters
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"], dependencies=[Depends(csrf_protect)])
@@ -52,13 +52,25 @@ PEOPLE_COLUMNS = (
 PAGE_SIZES = (12, 24, 48)  # multiples of 2 and 3, so rows of cards come out even
 
 
-def filters(
+async def filters(
+    session: SessionDep,
     days: int = Query(30, ge=1, le=365),
     repo_id: uuid.UUID | None = None,
     reviewer: str | None = Query(None, max_length=100),
     trigger: str | None = Query(None, max_length=30),
+    team: int | None = Query(None, ge=1),
 ) -> Filters:
-    return Filters.last(days, repo_id=repo_id, reviewer=reviewer, trigger=trigger)
+    """The slice from the query string. A team slice about fewer people than the minimum group is refused."""
+    f = Filters.last(days, repo_id=repo_id, reviewer=reviewer, trigger=trigger, team_id=team)
+    if team is not None:
+        min_group = (await analytics.privacy(session)).min_group
+        if not calc.visible(await analytics.team_people(session, f), min_group):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                f"This team covers fewer than {min_group} people in this slice, so its numbers are hidden. "
+                "Widen the period or clear a filter.",
+            )
+    return f
 
 
 FiltersDep = Annotated[Filters, Depends(filters)]
@@ -84,6 +96,28 @@ async def breakdown(by: Dimension, f: FiltersDep, session: SessionDep, _: AdminD
 async def breakdown_csv(by: Dimension, f: FiltersDep, session: SessionDep, _: AdminDep) -> PlainTextResponse:
     rows = await analytics.breakdown(session, f, by)
     return _csv(calc.to_csv(rows, BREAKDOWN_COLUMNS), f"chakshu-by-{by}")
+
+
+@router.get("/teams")
+async def by_team(f: FiltersDep, session: SessionDep, _: AdminDep) -> dict:
+    """One row per team. Rows overlap, since a run counts for every team its people were in."""
+    min_group = (await analytics.privacy(session)).min_group
+    return {
+        "min_group": min_group,
+        "teams_source": await teams.source(session),
+        "rows": await analytics.by_team(session, f, min_group),
+    }
+
+
+@router.get("/teams/options")
+async def team_options(session: SessionDep, _: AdminDep) -> list[dict]:
+    return await teams.options(session)
+
+
+@router.post("/teams/refresh")
+async def refresh_teams(session: SessionDep, creds: CredentialsDep, _: AdminDep) -> dict:
+    """Fetch teams and memberships from GitHub now, instead of waiting for the nightly sync."""
+    return {"teams_source": await teams.sync(session, creds)}
 
 
 @router.get("/cost")

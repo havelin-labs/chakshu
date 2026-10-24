@@ -13,6 +13,7 @@ from chakshu.handlers import (
     pull_request,
     pull_request_review_comment,
     push,
+    team,
     workflow_run,
 )
 from chakshu.handlers.context import Context, Payload
@@ -30,6 +31,8 @@ HANDLERS: dict[str, Handler] = {
     "pull_request": pull_request.handle,
     "pull_request_review_comment": pull_request_review_comment.handle,
     "push": push.handle,
+    "team": team.handle_team,
+    "membership": team.handle_membership,
     "workflow_run": workflow_run.handle,
 }
 

@@ -34,6 +34,7 @@ APP_PERMISSIONS = {
 }
 # pull_request_review_comment: someone replied to one of Chakshu's review comments
 # organization: members joining and leaving, for the People directory
+# team, membership: teams and who is directly in them, for the Teams view
 APP_EVENTS = [
     "pull_request",
     "issue_comment",
@@ -41,6 +42,8 @@ APP_EVENTS = [
     "push",
     "workflow_run",
     "organization",
+    "team",
+    "membership",
 ]
 
 
