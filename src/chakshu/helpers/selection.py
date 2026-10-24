@@ -9,7 +9,7 @@ their repos and paths say. Otherwise:
 Nothing left and someone asked: fall back to the org's `default` reviewer.
 `default` is also an ordinary reviewer: if its own repos and paths cover the pull
 request (the template uses repos ["*"]), it runs alongside the others, not only as
-the fallback.
+the fallback. To run just one reviewer, name it or request its own team (chakshu-<name>).
 """
 
 import re
