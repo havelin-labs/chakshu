@@ -186,7 +186,7 @@ export function SettingsPage() {
         </CardContent>
       </Card>
       {settings.data && <WebhooksCard webhooks={settings.data.webhooks} />}
-      {settings.data && <ActionsCard runnerUrl={settings.data.runner_url} runnerPublic={settings.data.runner_public} />}
+      {settings.data && <ActionsCard runnerUrl={settings.data.runner_url} runnerPublic={settings.data.runner_public} runsOn={settings.data.actions_runs_on} />}
       <Card className="mt-6">
         <CardContent className="space-y-3">
           <h2 className="text-xl font-bold">Review team</h2>
