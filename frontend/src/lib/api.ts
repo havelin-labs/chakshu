@@ -64,6 +64,7 @@ export type Reviewer = {
   product: string | null
   description: string | null
   owner_team: string
+  team: string // org/chakshu-<name>: request it in a PR's Reviewers box to run just this reviewer
   model: string | null
   repos: string[]
   paths: string[]
