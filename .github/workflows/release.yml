@@ -52,7 +52,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - uses: sigstore/cosign-installer@v4
+      - uses: sigstore/cosign-installer@v4.1.2 # no moving v4 tag upstream
       - name: Sign the image
         # Signing the digest covers every tag that points at it.
         run: cosign sign --yes "ghcr.io/${GITHUB_REPOSITORY}@${{ steps.build.outputs.digest }}"
