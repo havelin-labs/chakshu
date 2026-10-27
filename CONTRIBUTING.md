@@ -45,3 +45,18 @@ If you find yourself writing the same thing twice, it probably belongs in `helpe
 - `cd frontend && npm run lint && npm test && npm run build`
 - Write commit messages in the imperative ("Add webhook retry", not "Added..."), with a body that says why when it isn't obvious.
 - Keep pull requests to one concern. Smaller ones get reviewed faster.
+
+## Releasing
+
+1. In a pull request, set `version` in `pyproject.toml` and `__version__` in `src/chakshu/__init__.py` to the release, such as `0.2.0`, and merge it.
+2. Tag that commit and push the tag: `git tag v0.2.0 && git push origin v0.2.0`.
+
+The Release workflow checks the tag matches the version, then:
+
+- builds the image for linux/amd64 and linux/arm64 and pushes it to `ghcr.io/havelin-labs/chakshu` as `0.2.0`, `0.2` and `latest`, with an SBOM and provenance
+- signs it with cosign
+- moves the `v0.2` tag to the release
+- publishes a GitHub release with `compose.yaml` and `env.example` attached, so people can install without cloning
+
+A released server writes `havelin-labs/chakshu@v0.2` into each repository's workflow, so the moving tag carries patch releases to every repo. Afterwards, set the version to the next development version, such as `0.2.1.dev0`, so builds from `main` go back to running the action from `main`.
+

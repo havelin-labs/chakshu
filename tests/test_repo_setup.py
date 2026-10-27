@@ -13,6 +13,14 @@ from chakshu.services import actions_secrets, app_permissions, orgs, proposals, 
 from chakshu.services.repo_setup import ActionsStatus
 
 
+def test_released_servers_pin_the_action_to_their_minor_version():
+    assert workflow.default_action("0.1.0") == "havelin-labs/chakshu@v0.1"
+    assert workflow.default_action("1.12.3") == "havelin-labs/chakshu@v1.12"
+    assert workflow.default_action("0.2.0.dev0") == "havelin-labs/chakshu@main"
+    assert workflow.default_action("0.2.0rc1") == "havelin-labs/chakshu@main"
+    assert f"uses: {workflow.DEFAULT_ACTION}" in workflow.render()
+
+
 def test_secrets_are_sealed_for_the_repositorys_key():
     private = public.PrivateKey.generate()
     repo_key = private.public_key.encode(encoding.Base64Encoder()).decode()

@@ -1,6 +1,6 @@
 [project]
 name = "chakshu"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Self-hosted AI pull request reviewer for GitHub"
 readme = "README.md"
 license = "Apache-2.0"

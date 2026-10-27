@@ -3,10 +3,25 @@
 import re
 from importlib import resources
 
+from chakshu import __version__
+
 WORKFLOW_FILE = "chakshu.yml"
 WORKFLOW_PATH = f".github/workflows/{WORKFLOW_FILE}"
-# The action the workflow runs: this repository's action.yml.
-DEFAULT_ACTION = "havelin-labs/chakshu@main"
+ACTION_REPO = "havelin-labs/chakshu"
+
+
+def default_action(version: str = __version__) -> str:
+    """The action the workflow runs: this repository's action.yml, at a ref matching the server.
+
+    A released server pins its own minor version (v0.1), a tag each release moves forward, so
+    patch releases reach every repo without a new pull request and the runner always speaks
+    the server's protocol. Development builds track main.
+    """
+    release = re.fullmatch(r"(\d+)\.(\d+)\.\d+", version)
+    return f"{ACTION_REPO}@v{release[1]}.{release[2]}" if release else f"{ACTION_REPO}@main"
+
+
+DEFAULT_ACTION = default_action()
 # Repository secrets the workflow hands to the runner. Prefixed so they never clash with the repo's own.
 API_KEY_SECRET = "CHAKSHU_ANTHROPIC_API_KEY"
 TOKEN_SECRET = "CHAKSHU_CLAUDE_CODE_OAUTH_TOKEN"
