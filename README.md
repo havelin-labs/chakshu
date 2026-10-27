@@ -15,15 +15,26 @@ Docs: https://chakshu.havelin.in/docs
 
 ## Run it
 
-You need Docker with Compose, admin rights in a GitHub organization, and an Anthropic API key.
+You need Docker with Compose, admin rights in a GitHub organization, and an Anthropic API key or a Claude subscription token.
 
 ```bash
-git clone https://github.com/havelin-labs/chakshu.git && cd chakshu
-cp .env.example .env
-# set CHAKSHU_SECRET_KEY, POSTGRES_PASSWORD and CHAKSHU_BASE_URL in .env
-docker compose up -d --build --wait
+mkdir chakshu && cd chakshu
+curl -fsSLO https://github.com/havelin-labs/chakshu/releases/latest/download/compose.yaml
+curl -fsSL https://github.com/havelin-labs/chakshu/releases/latest/download/env.example -o .env
+# set CHAKSHU_SECRET_KEY (openssl rand -base64 48), POSTGRES_PASSWORD and CHAKSHU_BASE_URL in .env
+docker compose up -d --wait
 docker compose logs web | grep "Setup code"
 ```
+
+This pulls the released image, `ghcr.io/havelin-labs/chakshu`, built for amd64 and arm64. To upgrade, download the newer `compose.yaml` from [Releases](https://github.com/havelin-labs/chakshu/releases) and run `docker compose up -d` again; migrations run on start. To check the image was built by this repository's release workflow:
+
+```bash
+cosign verify ghcr.io/havelin-labs/chakshu:0.1.0 \
+  --certificate-identity-regexp '^https://github.com/havelin-labs/chakshu/\.github/workflows/release\.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+To run from source instead, clone the repository, copy `.env.example` to `.env` and run `docker compose up -d --build --wait`.
 
 Then open `CHAKSHU_BASE_URL` in a browser:
 

@@ -5,31 +5,41 @@ on:
     tags: ["v*.*.*"]
 
 permissions:
-  contents: write
+  contents: write # the GitHub release and the moving vX.Y tag
   packages: write
   id-token: write # keyless signing with cosign
 
 jobs:
-  image:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+
+      - name: Check the tag matches the package version
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match version $version in pyproject.toml"
+            exit 1
+          fi
+
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}
+          # 0.1.0 and 0.1, plus latest (added automatically for semver tags that aren't pre-releases).
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: runtime
@@ -41,14 +51,56 @@ jobs:
           provenance: mode=max
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - uses: sigstore/cosign-installer@v3
+
+      - uses: sigstore/cosign-installer@v4
       - name: Sign the image
-        env:
-          DIGEST: ${{ steps.build.outputs.digest }}
-          TAGS: ${{ steps.meta.outputs.tags }}
+        # Signing the digest covers every tag that points at it.
+        run: cosign sign --yes "ghcr.io/${GITHUB_REPOSITORY}@${{ steps.build.outputs.digest }}"
+
+      - name: Build the install files
+        # compose.yaml is docker-compose.yml without the build section, pinned to this version,
+        # so an install needs no clone and no build.
         run: |
-          for tag in $TAGS; do cosign sign --yes "${tag}@${DIGEST}"; done
+          version="${GITHUB_REF_NAME#v}"
+          mkdir dist
+          sed -e '/^  build:$/,/^    target: runtime$/d' \
+              -e "s/CHAKSHU_VERSION:-dev}/CHAKSHU_VERSION:-${version}}/" \
+              docker-compose.yml > dist/compose.yaml
+          cp .env.example dist/env.example
+          grep -q "chakshu:\${CHAKSHU_VERSION:-${version}}" dist/compose.yaml
+          if grep -q "build:" dist/compose.yaml; then echo "::error::build section left in compose.yaml"; exit 1; fi
+          cp dist/env.example dist/.env
+          (cd dist && POSTGRES_PASSWORD=x docker compose config --quiet)
+          rm dist/.env
+
+      - name: Point the vX.Y tag at this release
+        # Workflows in reviewed repos use havelin-labs/chakshu@vX.Y, so patch releases reach them
+        # without a new pull request in every repo.
+        run: |
+          minor=$(echo "$GITHUB_REF_NAME" | cut -d. -f1-2)
+          git tag -f "$minor"
+          git push -f origin "refs/tags/$minor"
+
       - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cat > notes.md <<NOTES
+          ## Install
+
+          \`\`\`bash
+          mkdir chakshu && cd chakshu
+          curl -fsSLO https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/compose.yaml
+          curl -fsSL https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/env.example -o .env
+          # set CHAKSHU_SECRET_KEY, POSTGRES_PASSWORD and CHAKSHU_BASE_URL in .env
+          docker compose up -d --wait
+          docker compose logs web | grep "Setup code"
+          \`\`\`
+
+          Image: \`ghcr.io/${GITHUB_REPOSITORY}:${version}\` (linux/amd64 and linux/arm64), signed with cosign.
+          Reviews in your repositories run \`${GITHUB_REPOSITORY}@$(echo "$GITHUB_REF_NAME" | cut -d. -f1-2)\`.
+
+          NOTES
+          gh release create "$GITHUB_REF_NAME" dist/compose.yaml dist/env.example \
+            --title "$GITHUB_REF_NAME" --notes "$(cat notes.md)" --generate-notes --verify-tag
