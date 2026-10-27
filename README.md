@@ -1,4 +1,9 @@
-<p align="center"><img src="brand/logo.svg" alt="Chakshu" width="260"></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/logo-dark.svg">
+    <img src="brand/logo.svg" alt="Chakshu" width="260">
+  </picture>
+</p>
 
 # Chakshu
 
